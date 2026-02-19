@@ -249,6 +249,9 @@ export default function RamadanStreak() {
         )}
       </div>
 
+      <div style={{ textAlign: 'center', marginTop: '40px', fontSize: '10px', color: 'var(--text-dim)', letterSpacing: '1px' }}>
+        v1.3
+      </div>
     </div>
   );
 }
