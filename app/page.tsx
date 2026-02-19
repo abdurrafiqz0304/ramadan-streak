@@ -2,10 +2,16 @@
 
 import { useState, useEffect } from "react";
 
-export default function RamadanStreak() {
+import { ZONES } from './data/zones';
+
+export default function Home() {
   const [fastStreak, setFastStreak] = useState(0);
   const [isFastedToday, setIsFastedToday] = useState(false);
   const [sahoorDone, setSahoorDone] = useState(false);
+
+  // State
+  const [showLocationModal, setShowLocationModal] = useState(false);
+  const [selectedState, setSelectedState] = useState<string>("Pahang");
 
   // State untuk Waktu Solat
   const [prayerTimes, setPrayerTimes] = useState<any>(null);
@@ -26,6 +32,19 @@ export default function RamadanStreak() {
   const [showReasonModal, setShowReasonModal] = useState(false);
   const [missedReason, setMissedReason] = useState<string>("");
 
+  // Terawih State
+  const [terawihCount, setTerawihCount] = useState<number | string>(0);
+  const [customTerawih, setCustomTerawih] = useState<string>("");
+  const [isCustomTerawih, setIsCustomTerawih] = useState(false);
+
+  // Diary State
+  const [diary, setDiary] = useState<string>("");
+
+  // Sidebar & Report State
+  const [showSidebar, setShowSidebar] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  const [history, setHistory] = useState<Record<string, any>>({});
+
   // Admin / Dev Tools State
   const [isAdmin, setIsAdmin] = useState(false);
   const [showAdminLogin, setShowAdminLogin] = useState(false);
@@ -40,11 +59,52 @@ export default function RamadanStreak() {
     isha: false
   });
 
+  // Location Modal Handler
+  const handleZoneChange = (zone: string) => {
+    setUserZone(zone);
+    setCoords(null); // Clear coordinates to favor Zone
+
+    // Save preference
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('ramadan_user_location', JSON.stringify({ zone: zone, type: 'manual' }));
+    }
+
+    setShowLocationModal(false);
+
+    // Fetch new times
+    setLoadingPrayer(true);
+    fetch(`/api/prayer-times?zone=${zone}`)
+      .then(res => res.json())
+      .then(json => {
+        // ... simplify fetch logic to reuse ...
+        // For now just triggering a reload might be safer/easier or calling fetchWaktuSolat with just zone updates
+        // But fetchWaktuSolat relies on args.
+        // Let's refactor fetchWaktuSolat slightly or just manually set state here.
+        if (json.prayerTime && json.prayerTime.length > 0) {
+          const waktuHariIni = json.prayerTime[0];
+          setPrayerTimes({
+            fajr: waktuHariIni.fajr.substring(0, 5),
+            dhuhr: waktuHariIni.dhuhr.substring(0, 5),
+            asr: waktuHariIni.asr.substring(0, 5),
+            maghrib: waktuHariIni.maghrib.substring(0, 5),
+            isha: waktuHariIni.isha.substring(0, 5),
+          });
+        }
+        setLoadingPrayer(false);
+      })
+      .catch(e => {
+        console.error(e);
+        setLoadingPrayer(false);
+      });
+  };
+
   const togglePrayer = (key: string) => {
     const newStatus = { ...prayerStatus, [key]: !prayerStatus[key] };
     setPrayerStatus(newStatus);
-    saveDataToStorage(newStatus, fastStreak, isFastedToday, sahoorDone, replacementList);
+    saveDataToStorage(newStatus, fastStreak, isFastedToday, sahoorDone, replacementList, terawihCount, diary);
   };
+
+
 
   const fetchWaktuSolat = async (latitude?: number, longitude?: number) => {
     setLoadingPrayer(true);
@@ -80,63 +140,113 @@ export default function RamadanStreak() {
 
 
   // Local Storage Logic
-  const saveDataToStorage = (pStatus: any, streak: number, fasted: boolean, sahoor: boolean, replacements: ReplacementDay[]) => {
+  // Local Storage Logic
+  const saveDataToStorage = (pStatus: any, streak: number, fasted: boolean, sahoor: boolean, replacements: ReplacementDay[], terawih: number | string, diaryEntry: string) => {
     if (typeof window === 'undefined') return;
-    const data = {
-      date: new Date().toLocaleDateString(),
+
+    const today = new Date().toLocaleDateString();
+    const currentDayData = {
+      date: today,
       streak,
       fasted,
       sahoor,
-      prayers: pStatus,
-      replacements
+      prayerStatus: pStatus,
+      replacements,
+      terawih,
+      diary: diaryEntry
+    };
+
+    // Load existing history to append/update
+    let currentHistory = history;
+    // If history state is empty (initial load issue), try to read from storage first? 
+    // Better: relies on state 'history' being up to date. 
+    // actually, let's read from storage to be safe or use the state if guaranteed.
+    // simpler: just use the parameter 'history' (wait, I can't pass history everywhere easily).
+    // Let's read from localStorage directly to ensure we have latest history
+
+    let savedHistory = {};
+    try {
+      const existing = localStorage.getItem('ramadan_streak_data');
+      if (existing) {
+        const parsed = JSON.parse(existing);
+        if (parsed.history) savedHistory = parsed.history;
+      }
+    } catch (e) { }
+
+    const newHistory = { ...savedHistory, [today]: currentDayData };
+    setHistory(newHistory); // Update state
+
+    const data = {
+      ...currentDayData,
+      history: newHistory
     };
     localStorage.setItem('ramadan_streak_data', JSON.stringify(data));
   };
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('ramadan_streak_data');
-      if (saved) {
-        try {
-          const data = JSON.parse(saved);
-          const today = new Date().toLocaleDateString();
+    // Load data
+    const savedData = localStorage.getItem('ramadan_streak_data');
+    if (savedData) {
+      try {
+        const parsed = JSON.parse(savedData);
+        const today = new Date().toLocaleDateString();
 
-          if (data.date === today) {
-            // Restore today's progress
-            setFastStreak(data.streak || 0);
-            setIsFastedToday(data.fasted || false);
-            setSahoorDone(data.sahoor || false);
-            setPrayerStatus(data.prayers || { fajr: false, dhuhr: false, asr: false, maghrib: false, isha: false });
-            setReplacementList(data.replacements || []);
-          } else {
-            // New Day: Reset daily trackers but keep streak
-            setFastStreak(data.streak || 0); // Logic could be added here to reset streak if missed
-            setIsFastedToday(false);
-            setSahoorDone(false);
-            setPrayerStatus({ fajr: false, dhuhr: false, asr: false, maghrib: false, isha: false });
-            setReplacementList(data.replacements || []);
-            // Save reset state immediately
-            saveDataToStorage({ fajr: false, dhuhr: false, asr: false, maghrib: false, isha: false }, data.streak || 0, false, false, data.replacements || []);
-          }
-        } catch (e) {
-          console.error("Failed to parse saved data", e);
+        // Load persistent data regardless of date
+        if (parsed.streak) setFastStreak(parsed.streak);
+        if (parsed.replacements) setReplacementList(parsed.replacements);
+        if (parsed.history) setHistory(parsed.history);
+
+        if (parsed.date === today) {
+          if (parsed.fasted) setIsFastedToday(parsed.fasted);
+          if (parsed.sahoor) setSahoorDone(parsed.sahoor);
+          if (parsed.prayerStatus) setPrayerStatus(parsed.prayerStatus);
+          if (parsed.terawih) setTerawihCount(parsed.terawih);
+          if (parsed.diary) setDiary(parsed.diary);
+        } else {
+          // New Day: Reset daily trackers but keep streak
+          // We don't save reset here to avoid overwriting before user sees it?
+          // Actually, we should just not load the old daily status
         }
+      } catch (e) {
+        console.error("Error parsing saved data", e);
       }
     }
 
-    // Check for cached location
+    // Load user zone pref
     const savedLoc = localStorage.getItem('ramadan_user_location');
     if (savedLoc) {
       try {
-        const { lat, long } = JSON.parse(savedLoc);
-        setCoords({ lat, long });
-        fetchWaktuSolat(lat, long);
+        const locData = JSON.parse(savedLoc);
+        if (locData.zone) {
+          setUserZone(locData.zone);
+          setLoadingPrayer(true);
+          fetch(`/api/prayer-times?zone=${locData.zone}`)
+            .then(res => res.json())
+            .then(json => {
+              if (json.prayerTime && json.prayerTime.length > 0) {
+                const waktuHariIni = json.prayerTime[0];
+                setPrayerTimes({
+                  fajr: waktuHariIni.fajr.substring(0, 5),
+                  dhuhr: waktuHariIni.dhuhr.substring(0, 5),
+                  asr: waktuHariIni.asr.substring(0, 5),
+                  maghrib: waktuHariIni.maghrib.substring(0, 5),
+                  isha: waktuHariIni.isha.substring(0, 5),
+                });
+              }
+              setLoadingPrayer(false);
+            })
+            .catch(() => setLoadingPrayer(false));
+        } else if (locData.lat && locData.long) {
+          setCoords({ lat: locData.lat, long: locData.long });
+          fetchWaktuSolat(locData.lat, locData.long);
+        } else {
+          detectLocation();
+        }
       } catch (e) {
-        console.error("Error parsing saved location");
-        fetchWaktuSolat(); // Fallback to default
+        detectLocation();
       }
     } else {
-      fetchWaktuSolat(); // No cache, load default
+      detectLocation();
     }
   }, []);
 
@@ -225,14 +335,35 @@ export default function RamadanStreak() {
       setIsFastedToday(true);
       const newStreak = fastStreak + 1;
       setFastStreak(newStreak);
-      saveDataToStorage(prayerStatus, newStreak, true, sahoorDone, replacementList);
+      saveDataToStorage(prayerStatus, newStreak, true, sahoorDone, replacementList, terawihCount, diary);
     }
   };
 
   const handleSahoorToggle = () => {
     const newState = !sahoorDone;
     setSahoorDone(newState);
-    saveDataToStorage(prayerStatus, fastStreak, isFastedToday, newState, replacementList);
+    saveDataToStorage(prayerStatus, fastStreak, isFastedToday, newState, replacementList, terawihCount, diary);
+  };
+
+  const handleTerawih = (count: number | string) => {
+    const newCount = terawihCount === count ? 0 : count; // Toggle if same, else set
+    setTerawihCount(newCount);
+    setIsCustomTerawih(false); // Reset custom state if standard option clicked
+    saveDataToStorage(prayerStatus, fastStreak, isFastedToday, sahoorDone, replacementList, newCount, diary);
+  };
+
+  const handleCustomTerawihSave = () => {
+    if (customTerawih.trim()) {
+      const val = customTerawih.trim();
+      setTerawihCount(val);
+      setIsCustomTerawih(false);
+      saveDataToStorage(prayerStatus, fastStreak, isFastedToday, sahoorDone, replacementList, val, diary);
+    }
+  };
+
+  const handleDiaryChange = (val: string) => {
+    setDiary(val);
+    saveDataToStorage(prayerStatus, fastStreak, isFastedToday, sahoorDone, replacementList, terawihCount, val);
   };
 
   const handleMissedFast = () => {
@@ -240,38 +371,28 @@ export default function RamadanStreak() {
   };
 
   const confirmMissedFast = (reason: string) => {
-    let newReplacements = [...replacementList];
-    const today = new Date();
+    let dayToLog: ReplacementDay[] = [];
 
-    if (reason === "Haid") {
-      // Add 7 days starting from today
-      for (let i = 0; i < 7; i++) {
-        const date = new Date(today);
-        date.setDate(today.getDate() + i);
-        newReplacements.push({
-          id: Date.now() + i,
-          date: date.toLocaleDateString(),
-          reason: "Haid",
-          completed: false
-        });
-      }
-    } else {
-      // Add only today
-      newReplacements.push({
-        id: Date.now(),
-        date: today.toLocaleDateString(),
-        reason: reason,
-        completed: false
-      });
-    }
+    // Jika "Uzur", log 1 hari sahaja (seperti feedback user)
+    // Jika "Haid" (legacy code) or others, log 1 hari.
+    // Logic: always 1 entry per click for now as per feedback.
 
-    setReplacementList(newReplacements);
-    setFastStreak(0); // Reset streak
-    setIsFastedToday(false); // Mark as not fasted
+    // Create new entry
+    const newEntry: ReplacementDay = {
+      id: Date.now(),
+      date: new Date().toLocaleDateString(),
+      reason: reason,
+      completed: false
+    };
+
+    const updatedList = [...replacementList, newEntry];
+    setReplacementList(updatedList);
+
+    setIsFastedToday(false); // Reset fast status if they add missed fast
     setShowReasonModal(false);
+    saveDataToStorage(prayerStatus, fastStreak, false, sahoorDone, updatedList, terawihCount, diary);
 
-    // Save everything
-    saveDataToStorage(prayerStatus, 0, false, sahoorDone, newReplacements);
+    alert(`Rekod tidak puasa (${reason}) ditambah. Jangan lupa ganti ya!`);
   };
 
   const toggleReplacement = (id: number) => {
@@ -279,7 +400,15 @@ export default function RamadanStreak() {
       item.id === id ? { ...item, completed: !item.completed } : item
     );
     setReplacementList(updatedList);
-    saveDataToStorage(prayerStatus, fastStreak, isFastedToday, sahoorDone, updatedList);
+    saveDataToStorage(prayerStatus, fastStreak, isFastedToday, sahoorDone, updatedList, terawihCount, diary);
+  };
+
+  const scrollToSection = (id: string) => {
+    setShowSidebar(false);
+    const element = document.getElementById(id);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
   };
 
   // ADMIN TOOLS
@@ -304,7 +433,7 @@ export default function RamadanStreak() {
   const devStreak = (amount: number) => {
     const newStreak = Math.max(0, fastStreak + amount);
     setFastStreak(newStreak);
-    saveDataToStorage(prayerStatus, newStreak, isFastedToday, sahoorDone, replacementList);
+    saveDataToStorage(prayerStatus, newStreak, isFastedToday, sahoorDone, replacementList, terawihCount, diary);
   };
 
   const devNewDay = () => {
@@ -312,7 +441,7 @@ export default function RamadanStreak() {
     setIsFastedToday(false);
     setSahoorDone(false);
     setPrayerStatus({ fajr: false, dhuhr: false, asr: false, maghrib: false, isha: false });
-    saveDataToStorage({ fajr: false, dhuhr: false, asr: false, maghrib: false, isha: false }, newStreak, false, false, replacementList);
+    saveDataToStorage({ fajr: false, dhuhr: false, asr: false, maghrib: false, isha: false }, newStreak, false, false, replacementList, 0, "");
     alert("Simulated New Day! (Streak preserved, checked items reset)");
   };
 
@@ -324,19 +453,33 @@ export default function RamadanStreak() {
     { key: 'isha', name: 'Isyak', emoji: '🌙' },
   ];
 
+  const sidebarLinkStyle = {
+    textAlign: 'left' as 'left',
+    padding: '12px',
+    background: 'var(--surface2)',
+    border: 'none',
+    borderRadius: '8px',
+    color: 'var(--text)',
+    fontSize: '14px',
+    cursor: 'pointer'
+  };
+
   return (
     <div className="app animate-enter">
       {/* Topbar */}
       <div className="topbar">
         <div className="topbar-brand">
-          <span className="brand-name">Ramadan</span>
-          <span className="brand-year">1447 AH</span>
+          <button onClick={() => setShowSidebar(true)} style={{ background: 'none', border: 'none', color: 'var(--text)', fontSize: '24px', marginRight: '10px', cursor: 'pointer' }}>☰</button>
+          <div>
+            <span className="brand-name">Ramadan</span>
+            <span className="brand-year">1447 AH</span>
+          </div>
         </div>
       </div>
 
-      {/* Hero streak */}
-      <div className="hero">
-        <div className="hero-label">Streak Puasa</div>
+      {/* CHECKLIST SECTION */}
+      <div id="tracker" style={{ marginTop: '30px' }}>
+        <div className="section-header">Streak Puasa</div>
         <div className="hero-streak-row">
           <div className="hero-num">{fastStreak}</div>
           <div className="hero-unit">hari</div>
@@ -359,8 +502,9 @@ export default function RamadanStreak() {
           <div className="next-prayer-time">{timeToNextPrayer}</div>
         </div>
       )}
-
-      <div className="section-label">Hari Ini</div>
+      {/* Daily Prayer Times */}
+      <div id="solat"></div>
+      <div className="section-title">Waktu Solat</div>
 
       {/* Today tracker card */}
       <div className="card animate-enter delay-200">
@@ -402,10 +546,9 @@ export default function RamadanStreak() {
       <div className="section-label flex justify-between items-center">
         <span>Waktu Solat</span>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <button onClick={detectLocation} disabled={loadingPrayer} style={{ background: 'none', border: 'none', color: 'var(--gold)', cursor: 'pointer', fontSize: '14px', opacity: loadingPrayer ? 0.7 : 1 }}>
-            {loadingPrayer ? '🛰️ Mencari...' : '📍 Set Lokasi'}
+          <button onClick={() => setShowLocationModal(true)} disabled={loadingPrayer} style={{ background: 'none', border: 'none', color: 'var(--gold)', cursor: 'pointer', fontSize: '14px', opacity: loadingPrayer ? 0.7 : 1 }}>
+            {loadingPrayer ? '🛰️ Mencari...' : `📍 ${userZone}`}
           </button>
-          <span style={{ fontSize: '10px', background: 'var(--surface2)', padding: '2px 6px', borderRadius: '4px' }}>{userZone}</span>
         </div>
       </div>
 
@@ -435,10 +578,111 @@ export default function RamadanStreak() {
           </div>
         )}
       </div>
+      {/* TERAWIH TRACKER */}
+      <div id="terawih" className="card animate-enter delay-200" style={{ marginTop: '20px', padding: '20px' }}>
+        <div className="section-label" style={{ marginBottom: '16px' }}>Solat Terawih 🕌</div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', background: 'var(--surface2)', borderRadius: '16px', padding: '8px' }}>
+          {/* 8 Rakaat */}
+          <button
+            onClick={() => handleTerawih(8)}
+            style={{
+              padding: '14px', borderRadius: '12px', border: 'none',
+              background: terawihCount === 8 ? 'var(--gold)' : 'transparent',
+              color: terawihCount === 8 ? 'var(--surface)' : 'var(--text-muted)',
+              fontWeight: 'bold', transition: 'all 0.2s',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px'
+            }}
+          >
+            <span style={{ fontSize: '16px' }}>8</span>
+            <span style={{ fontSize: '10px', opacity: 0.8 }}>Rakaat</span>
+          </button>
+
+          {/* 20 Rakaat */}
+          <button
+            onClick={() => handleTerawih(20)}
+            style={{
+              padding: '14px', borderRadius: '12px', border: 'none',
+              background: terawihCount === 20 ? 'var(--gold)' : 'transparent',
+              color: terawihCount === 20 ? 'var(--surface)' : 'var(--text-muted)',
+              fontWeight: 'bold', transition: 'all 0.2s',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px'
+            }}
+          >
+            <span style={{ fontSize: '16px' }}>20</span>
+            <span style={{ fontSize: '10px', opacity: 0.8 }}>Rakaat</span>
+          </button>
+
+          {/* Lain-lain */}
+          <button
+            onClick={() => setIsCustomTerawih(true)}
+            style={{
+              padding: '14px', borderRadius: '12px', border: 'none',
+              background: (typeof terawihCount === 'string' && terawihCount !== "Tak Buat") || isCustomTerawih ? 'var(--gold)' : 'transparent',
+              color: (typeof terawihCount === 'string' && terawihCount !== "Tak Buat") || isCustomTerawih ? 'var(--surface)' : 'var(--text-muted)',
+              fontWeight: 'bold', transition: 'all 0.2s',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px'
+            }}
+          >
+            <span style={{ fontSize: '16px' }}>✏️</span>
+            <span style={{ fontSize: '10px', opacity: 0.8 }}>Lain-lain</span>
+          </button>
+
+          {/* Tak Buat */}
+          <button
+            onClick={() => handleTerawih("Tak Buat")}
+            style={{
+              padding: '14px', borderRadius: '12px', border: 'none',
+              background: terawihCount === "Tak Buat" ? 'var(--red)' : 'transparent',
+              color: terawihCount === "Tak Buat" ? 'white' : 'var(--text-muted)',
+              fontWeight: 'bold', transition: 'all 0.2s',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px'
+            }}
+          >
+            <span style={{ fontSize: '16px' }}>🚫</span>
+            <span style={{ fontSize: '10px', opacity: 0.8 }}>Tak Buat</span>
+          </button>
+        </div>
+
+        {/* Custom Input Field */}
+        {isCustomTerawih && (
+          <div style={{ marginTop: '12px', display: 'flex', gap: '8px', animation: 'fadeIn 0.3s' }}>
+            <input
+              type="text"
+              placeholder="Contoh: 12 rakaat / Di rumah"
+              value={customTerawih}
+              onChange={(e) => setCustomTerawih(e.target.value)}
+              style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }}
+            />
+            <button onClick={handleCustomTerawihSave} style={{ padding: '0 16px', borderRadius: '8px', background: 'var(--gold)', color: 'var(--surface)', border: 'none', fontWeight: 'bold' }}>OK</button>
+          </div>
+        )}
+
+        {/* Feedback Message */}
+        {terawihCount !== 0 && !isCustomTerawih && (
+          <div style={{ textAlign: 'center', marginTop: '12px', fontSize: '12px', color: 'var(--gold)', animation: 'fadeIn 0.3s' }}>
+            {terawihCount === "Tak Buat" ? "Tak apa, cuba lagi esok! 💪" : typeof terawihCount === 'string' ? `Rekod: ${terawihCount}` : "✨ Alhamdulillah! Semoga diterima amal."}
+          </div>
+        )}
+      </div>
+
+      <div id="diari" className="card animate-enter delay-200" style={{ marginTop: '20px', padding: '20px' }}>
+        <div className="section-label" style={{ marginBottom: '15px' }}>📔 Diari Ramadan</div>
+        <textarea
+          value={diary}
+          onChange={(e) => handleDiaryChange(e.target.value)}
+          placeholder="Catatan hari ini... (cth: Perasaan, doa, atau checklist ibadah lain)"
+          style={{
+            width: '100%', height: '100px', padding: '12px', borderRadius: '12px',
+            background: 'var(--surface2)', border: 'none', color: 'var(--text)',
+            fontFamily: 'inherit', resize: 'vertical'
+          }}
+        />
+      </div>
 
       {/* GANTI PUASA LIST */}
       {replacementList.length > 0 && (
-        <div className="card animate-enter delay-300" style={{ marginTop: '20px' }}>
+        <div className="card animate-enter delay-300" style={{ marginTop: '20px', padding: '20px' }}>
           <div className="section-label" style={{ marginBottom: '16px' }}>Ganti Puasa ({replacementList.filter(r => !r.completed).length})</div>
           {replacementList.filter(r => !r.completed).map(item => (
             <div key={item.id} className="tracker-row" onClick={() => toggleReplacement(item.id)}>
@@ -468,7 +712,7 @@ export default function RamadanStreak() {
             <h3 style={{ marginTop: 0, marginBottom: '16px', color: 'var(--text)' }}>Kenapa tidak berpuasa?</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <button onClick={() => confirmMissedFast("Musafir")} style={{ padding: '12px', borderRadius: '8px', background: 'var(--surface2)', border: 'none', color: 'var(--text)', textAlign: 'left' }}>✈️ Musafir</button>
-              <button onClick={() => confirmMissedFast("Haid")} style={{ padding: '12px', borderRadius: '8px', background: 'var(--surface2)', border: 'none', color: 'var(--text)', textAlign: 'left' }}>🩸 Haid (Auto 7 hari)</button>
+              <button onClick={() => confirmMissedFast("Uzur")} style={{ padding: '12px', borderRadius: '8px', background: 'var(--surface2)', border: 'none', color: 'var(--text)', textAlign: 'left' }}>🩸 Uzur</button>
               <button onClick={() => confirmMissedFast("Terbatal")} style={{ padding: '12px', borderRadius: '8px', background: 'var(--surface2)', border: 'none', color: 'var(--text)', textAlign: 'left' }}>❌ Terbatal</button>
               <button onClick={() => confirmMissedFast("Lain-lain")} style={{ padding: '12px', borderRadius: '8px', background: 'var(--surface2)', border: 'none', color: 'var(--text)', textAlign: 'left' }}>📝 Lain-lain</button>
             </div>
@@ -506,24 +750,104 @@ export default function RamadanStreak() {
       )}
 
       {/* ADMIN LOGIN MODAL */}
-      {showAdminLogin && !isAdmin && (
+      {/* SIDEBAR NAVIGATION */}
+      {showSidebar && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+          background: 'rgba(0,0,0,0.5)', zIndex: 1000,
+          animation: 'fadeIn 0.2s'
+        }} onClick={() => setShowSidebar(false)}>
+          <div style={{
+            width: '280px', height: '100%', background: 'var(--surface)',
+            boxShadow: 'var(--shadow)', padding: '20px',
+            display: 'flex', flexDirection: 'column',
+            animation: 'slideRight 0.3s' // Need to define slideRight or rely on default
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
+              <h2 style={{ margin: 0, color: 'var(--gold)' }}>Menu</h2>
+              <button onClick={() => setShowSidebar(false)} style={{ background: 'none', border: 'none', color: 'var(--text)', fontSize: '24px' }}>✕</button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+              <button onClick={() => scrollToSection('solat')} style={sidebarLinkStyle}>Query Waktu Solat</button>
+              <button onClick={() => scrollToSection('tracker')} style={sidebarLinkStyle}>Checklist & Sahur</button>
+              <button onClick={() => scrollToSection('terawih')} style={sidebarLinkStyle}>Terawih Tracker</button>
+              <button onClick={() => scrollToSection('diari')} style={sidebarLinkStyle}>Diari Ramadan</button>
+              <button onClick={() => window.location.href = '/laporan'} style={{ ...sidebarLinkStyle, color: 'var(--gold)', border: '1px solid var(--border-gold)' }}>📊 Laporan Penuh</button>
+            </div>
+
+            <div style={{ marginTop: 'auto', fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center' }}>
+              Ramadan Streak v1.7 <br />
+              Made with ❤️
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Login Modal */}
+      {showAdminLogin && (
+        <div className="modal-overlay" style={{ display: 'flex' }}>
+          <div className="modal-content animate-enter">
+            <h3>Admin Login</h3>
+            <input
+              type="password"
+              placeholder="Password"
+              value={adminPassword}
+              onChange={e => setAdminPassword(e.target.value)}
+              style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'white' }}
+            />
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={() => setShowAdminLogin(false)} style={{ flex: 1, padding: '10px', borderRadius: '8px', background: 'var(--surface)', color: 'white', border: 'none' }}>Cancel</button>
+              <button onClick={handleAdminLogin} style={{ flex: 1, padding: '10px', borderRadius: '8px', background: 'var(--gold)', color: 'var(--surface)', border: 'none', fontWeight: 'bold' }}>Login</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* LOCATION MODAL */}
+      {showLocationModal && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
           background: 'rgba(0,0,0,0.8)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000
         }}>
-          <div style={{ background: 'var(--surface)', padding: '24px', borderRadius: '16px', width: '80%', maxWidth: '300px', border: '1px solid var(--border)' }}>
-            <h3 style={{ marginTop: 0, marginBottom: '16px', color: 'var(--text)', textAlign: 'center' }}>Admin Access</h3>
-            <input
-              type="password"
-              placeholder="Enter Password"
-              value={adminPassword}
-              onChange={(e) => setAdminPassword(e.target.value)}
-              style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', marginBottom: '16px' }}
-            />
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button onClick={() => setShowAdminLogin(false)} style={{ flex: 1, padding: '10px', background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-muted)', borderRadius: '8px' }}>Cancel</button>
-              <button onClick={handleAdminLogin} style={{ flex: 1, padding: '10px', background: 'var(--gold)', border: 'none', color: 'var(--surface)', borderRadius: '8px', fontWeight: 'bold' }}>Login</button>
+          <div style={{ background: 'var(--surface)', padding: '24px', borderRadius: '16px', width: '90%', maxWidth: '350px', border: '1px solid var(--border)', maxHeight: '80vh', overflowY: 'auto' }}>
+            <h3 style={{ marginTop: 0, marginBottom: '16px', color: 'var(--text)', textAlign: 'center' }}>Pilih Kawasan</h3>
+
+            {/* State Selector */}
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '8px', fontSize: '12px' }}>Negeri</label>
+              <select
+                value={selectedState}
+                onChange={(e) => setSelectedState(e.target.value)}
+                style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)' }}
+              >
+                {Object.keys(ZONES).map(state => (
+                  <option key={state} value={state}>{state}</option>
+                ))}
+              </select>
             </div>
+
+            {/* Zone Selector */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ display: 'block', color: 'var(--text-muted)', fontSize: '12px' }}>Zon (Klik untuk pilih)</label>
+              {ZONES[selectedState as keyof typeof ZONES]?.map((zone: any) => (
+                <button
+                  key={zone.code}
+                  onClick={() => handleZoneChange(zone.code)}
+                  style={{
+                    padding: '12px', borderRadius: '8px', border: 'none',
+                    background: userZone === zone.code ? 'var(--gold)' : 'var(--surface2)',
+                    color: userZone === zone.code ? 'var(--surface)' : 'var(--text)',
+                    textAlign: 'left', fontSize: '13px', lineHeight: '1.4'
+                  }}
+                >
+                  <div style={{ fontWeight: 'bold' }}>{zone.code}</div>
+                  <div style={{ opacity: 0.8 }}>{zone.name}</div>
+                </button>
+              ))}
+            </div>
+
+            <button onClick={() => setShowLocationModal(false)} style={{ marginTop: '20px', padding: '10px', width: '100%', background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-muted)', borderRadius: '8px' }}>Tutup</button>
           </div>
         </div>
       )}
