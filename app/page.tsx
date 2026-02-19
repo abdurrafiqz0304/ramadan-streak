@@ -15,6 +15,21 @@ export default function RamadanStreak() {
   const [userZone, setUserZone] = useState<string>("PHG03");
   const [coords, setCoords] = useState<{ lat: number, long: number } | null>(null);
 
+  // Prayer Status Checklist
+  const [prayerStatus, setPrayerStatus] = useState<Record<string, boolean>>({
+    fajr: false,
+    dhuhr: false,
+    asr: false,
+    maghrib: false,
+    isha: false
+  });
+
+  const togglePrayer = (key: string) => {
+    const newStatus = { ...prayerStatus, [key]: !prayerStatus[key] };
+    setPrayerStatus(newStatus);
+    saveDataToStorage(newStatus, fastStreak, isFastedToday, sahoorDone);
+  };
+
   const fetchWaktuSolat = async (latitude?: number, longitude?: number) => {
     setLoadingPrayer(true);
     try {
@@ -46,8 +61,64 @@ export default function RamadanStreak() {
     }
   };
 
+
+
+  // Local Storage Logic
+  const saveDataToStorage = (pStatus: any, streak: number, fasted: boolean, sahoor: boolean) => {
+    if (typeof window === 'undefined') return;
+    const data = {
+      date: new Date().toLocaleDateString(),
+      streak,
+      fasted,
+      sahoor,
+      prayers: pStatus
+    };
+    localStorage.setItem('ramadan_streak_data', JSON.stringify(data));
+  };
+
   useEffect(() => {
-    fetchWaktuSolat();
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('ramadan_streak_data');
+      if (saved) {
+        try {
+          const data = JSON.parse(saved);
+          const today = new Date().toLocaleDateString();
+
+          if (data.date === today) {
+            // Restore today's progress
+            setFastStreak(data.streak || 0);
+            setIsFastedToday(data.fasted || false);
+            setSahoorDone(data.sahoor || false);
+            setPrayerStatus(data.prayers || { fajr: false, dhuhr: false, asr: false, maghrib: false, isha: false });
+          } else {
+            // New Day: Reset daily trackers but keep streak
+            setFastStreak(data.streak || 0); // Logic could be added here to reset streak if missed
+            setIsFastedToday(false);
+            setSahoorDone(false);
+            setPrayerStatus({ fajr: false, dhuhr: false, asr: false, maghrib: false, isha: false });
+            // Save reset state immediately
+            saveDataToStorage({ fajr: false, dhuhr: false, asr: false, maghrib: false, isha: false }, data.streak || 0, false, false);
+          }
+        } catch (e) {
+          console.error("Failed to parse saved data", e);
+        }
+      }
+    }
+
+    // Check for cached location
+    const savedLoc = localStorage.getItem('ramadan_user_location');
+    if (savedLoc) {
+      try {
+        const { lat, long } = JSON.parse(savedLoc);
+        setCoords({ lat, long });
+        fetchWaktuSolat(lat, long);
+      } catch (e) {
+        console.error("Error parsing saved location");
+        fetchWaktuSolat(); // Fallback to default
+      }
+    } else {
+      fetchWaktuSolat(); // No cache, load default
+    }
   }, []);
 
   const detectLocation = () => {
@@ -57,6 +128,12 @@ export default function RamadanStreak() {
         (position) => {
           const { latitude, longitude } = position.coords;
           setCoords({ lat: latitude, long: longitude });
+
+          // Save to cache
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('ramadan_user_location', JSON.stringify({ lat: latitude, long: longitude }));
+          }
+
           fetchWaktuSolat(latitude, longitude);
         },
         (error) => {
@@ -127,8 +204,16 @@ export default function RamadanStreak() {
   const handleFastToday = () => {
     if (!isFastedToday) {
       setIsFastedToday(true);
-      setFastStreak(fastStreak + 1);
+      const newStreak = fastStreak + 1;
+      setFastStreak(newStreak);
+      saveDataToStorage(prayerStatus, newStreak, true, sahoorDone);
     }
+  };
+
+  const handleSahoorToggle = () => {
+    const newState = !sahoorDone;
+    setSahoorDone(newState);
+    saveDataToStorage(prayerStatus, fastStreak, isFastedToday, newState);
   };
 
   const prayersList = [
@@ -198,7 +283,7 @@ export default function RamadanStreak() {
           </div>
         </div>
 
-        <div className={`tracker-row ${sahoorDone ? "checked row-checked" : ""}`} onClick={() => setSahoorDone(!sahoorDone)}>
+        <div className={`tracker-row ${sahoorDone ? "checked row-checked" : ""}`} onClick={handleSahoorToggle}>
           <div className="tracker-left">
             <div className="tracker-icon">🌅</div>
             <div className="tracker-info">
@@ -214,8 +299,8 @@ export default function RamadanStreak() {
       <div className="section-label flex justify-between items-center">
         <span>Waktu Solat</span>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <button onClick={detectLocation} style={{ background: 'none', border: 'none', color: 'var(--gold)', cursor: 'pointer', fontSize: '14px' }}>
-            📍 Set Lokasi
+          <button onClick={detectLocation} disabled={loadingPrayer} style={{ background: 'none', border: 'none', color: 'var(--gold)', cursor: 'pointer', fontSize: '14px', opacity: loadingPrayer ? 0.7 : 1 }}>
+            {loadingPrayer ? '🛰️ Mencari...' : '📍 Set Lokasi'}
           </button>
           <span style={{ fontSize: '10px', background: 'var(--surface2)', padding: '2px 6px', borderRadius: '4px' }}>{userZone}</span>
         </div>
@@ -229,18 +314,17 @@ export default function RamadanStreak() {
           </div>
         ) : prayerTimes ? (
           <div>
-            {prayersList.map((p) => (
-              <div key={p.key} className={`prayer-time-row ${nextPrayer === p.name ? 'prayer-next' : ''}`}>
-                <div style={{ display: 'flex', alignItems: 'center' }}>
-                  <span className="prayer-time-emoji">{p.emoji}</span>
-                  <span className="prayer-name">{p.name}</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <span className="prayer-time-val">{prayerTimes[p.key]}</span>
-                  <div className="prayer-chk"></div>
-                </div>
+            {prayersList.map((p) => <div key={p.key} className={`prayer-time-row ${nextPrayer === p.name ? 'prayer-next' : ''} ${prayerStatus[p.key] ? 'done' : ''}`} onClick={() => togglePrayer(p.key)}>
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <span className="prayer-time-emoji">{p.emoji}</span>
+                <span className="prayer-name">{p.name}</span>
               </div>
-            ))}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span className="prayer-time-val">{prayerTimes[p.key]}</span>
+                <div className="prayer-chk"></div>
+              </div>
+            </div>
+            )}
           </div>
         ) : (
           <div style={{ padding: '20px', textAlign: 'center', fontSize: '12px', color: 'var(--red)' }}>
