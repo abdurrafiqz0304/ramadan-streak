@@ -15,6 +15,22 @@ export default function RamadanStreak() {
   const [userZone, setUserZone] = useState<string>("PHG03");
   const [coords, setCoords] = useState<{ lat: number, long: number } | null>(null);
 
+  // Missed Fast Logic
+  interface ReplacementDay {
+    id: number;
+    date: string;
+    reason: string;
+    completed: boolean;
+  }
+  const [replacementList, setReplacementList] = useState<ReplacementDay[]>([]);
+  const [showReasonModal, setShowReasonModal] = useState(false);
+  const [missedReason, setMissedReason] = useState<string>("");
+
+  // Admin / Dev Tools State
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [showAdminLogin, setShowAdminLogin] = useState(false);
+  const [adminPassword, setAdminPassword] = useState("");
+
   // Prayer Status Checklist
   const [prayerStatus, setPrayerStatus] = useState<Record<string, boolean>>({
     fajr: false,
@@ -27,7 +43,7 @@ export default function RamadanStreak() {
   const togglePrayer = (key: string) => {
     const newStatus = { ...prayerStatus, [key]: !prayerStatus[key] };
     setPrayerStatus(newStatus);
-    saveDataToStorage(newStatus, fastStreak, isFastedToday, sahoorDone);
+    saveDataToStorage(newStatus, fastStreak, isFastedToday, sahoorDone, replacementList);
   };
 
   const fetchWaktuSolat = async (latitude?: number, longitude?: number) => {
@@ -64,14 +80,15 @@ export default function RamadanStreak() {
 
 
   // Local Storage Logic
-  const saveDataToStorage = (pStatus: any, streak: number, fasted: boolean, sahoor: boolean) => {
+  const saveDataToStorage = (pStatus: any, streak: number, fasted: boolean, sahoor: boolean, replacements: ReplacementDay[]) => {
     if (typeof window === 'undefined') return;
     const data = {
       date: new Date().toLocaleDateString(),
       streak,
       fasted,
       sahoor,
-      prayers: pStatus
+      prayers: pStatus,
+      replacements
     };
     localStorage.setItem('ramadan_streak_data', JSON.stringify(data));
   };
@@ -90,14 +107,16 @@ export default function RamadanStreak() {
             setIsFastedToday(data.fasted || false);
             setSahoorDone(data.sahoor || false);
             setPrayerStatus(data.prayers || { fajr: false, dhuhr: false, asr: false, maghrib: false, isha: false });
+            setReplacementList(data.replacements || []);
           } else {
             // New Day: Reset daily trackers but keep streak
             setFastStreak(data.streak || 0); // Logic could be added here to reset streak if missed
             setIsFastedToday(false);
             setSahoorDone(false);
             setPrayerStatus({ fajr: false, dhuhr: false, asr: false, maghrib: false, isha: false });
+            setReplacementList(data.replacements || []);
             // Save reset state immediately
-            saveDataToStorage({ fajr: false, dhuhr: false, asr: false, maghrib: false, isha: false }, data.streak || 0, false, false);
+            saveDataToStorage({ fajr: false, dhuhr: false, asr: false, maghrib: false, isha: false }, data.streak || 0, false, false, data.replacements || []);
           }
         } catch (e) {
           console.error("Failed to parse saved data", e);
@@ -206,14 +225,95 @@ export default function RamadanStreak() {
       setIsFastedToday(true);
       const newStreak = fastStreak + 1;
       setFastStreak(newStreak);
-      saveDataToStorage(prayerStatus, newStreak, true, sahoorDone);
+      saveDataToStorage(prayerStatus, newStreak, true, sahoorDone, replacementList);
     }
   };
 
   const handleSahoorToggle = () => {
     const newState = !sahoorDone;
     setSahoorDone(newState);
-    saveDataToStorage(prayerStatus, fastStreak, isFastedToday, newState);
+    saveDataToStorage(prayerStatus, fastStreak, isFastedToday, newState, replacementList);
+  };
+
+  const handleMissedFast = () => {
+    setShowReasonModal(true);
+  };
+
+  const confirmMissedFast = (reason: string) => {
+    let newReplacements = [...replacementList];
+    const today = new Date();
+
+    if (reason === "Haid") {
+      // Add 7 days starting from today
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(today);
+        date.setDate(today.getDate() + i);
+        newReplacements.push({
+          id: Date.now() + i,
+          date: date.toLocaleDateString(),
+          reason: "Haid",
+          completed: false
+        });
+      }
+    } else {
+      // Add only today
+      newReplacements.push({
+        id: Date.now(),
+        date: today.toLocaleDateString(),
+        reason: reason,
+        completed: false
+      });
+    }
+
+    setReplacementList(newReplacements);
+    setFastStreak(0); // Reset streak
+    setIsFastedToday(false); // Mark as not fasted
+    setShowReasonModal(false);
+
+    // Save everything
+    saveDataToStorage(prayerStatus, 0, false, sahoorDone, newReplacements);
+  };
+
+  const toggleReplacement = (id: number) => {
+    const updatedList = replacementList.map(item =>
+      item.id === id ? { ...item, completed: !item.completed } : item
+    );
+    setReplacementList(updatedList);
+    saveDataToStorage(prayerStatus, fastStreak, isFastedToday, sahoorDone, updatedList);
+  };
+
+  // ADMIN TOOLS
+  const handleAdminLogin = () => {
+    if (adminPassword === "admin123") {
+      setIsAdmin(true);
+      setShowAdminLogin(false);
+      setAdminPassword("");
+    } else {
+      alert("Salah password!");
+    }
+  };
+
+  // DEV TOOLS HANDLERS
+  const devReset = () => {
+    if (confirm("Reset semua data?")) {
+      localStorage.clear();
+      window.location.reload();
+    }
+  };
+
+  const devStreak = (amount: number) => {
+    const newStreak = Math.max(0, fastStreak + amount);
+    setFastStreak(newStreak);
+    saveDataToStorage(prayerStatus, newStreak, isFastedToday, sahoorDone, replacementList);
+  };
+
+  const devNewDay = () => {
+    const newStreak = fastStreak; // Keep streak
+    setIsFastedToday(false);
+    setSahoorDone(false);
+    setPrayerStatus({ fajr: false, dhuhr: false, asr: false, maghrib: false, isha: false });
+    saveDataToStorage({ fajr: false, dhuhr: false, asr: false, maghrib: false, isha: false }, newStreak, false, false, replacementList);
+    alert("Simulated New Day! (Streak preserved, checked items reset)");
   };
 
   const prayersList = [
@@ -275,7 +375,10 @@ export default function RamadanStreak() {
             </div>
             <div className="fast-btn-area">
               {!isFastedToday ? (
-                <button className="fast-action-btn confirm" onClick={handleFastToday}>✓ Puasa</button>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button className="fast-action-btn confirm" onClick={handleFastToday}>✓ Puasa</button>
+                  <button className="fast-action-btn" onClick={handleMissedFast} style={{ background: 'var(--red)', color: 'white', opacity: 0.8 }}>× Tak</button>
+                </div>
               ) : (
                 <span className="fast-action-btn" style={{ border: 'none', background: 'transparent', color: 'var(--gold)' }}>Direkod</span>
               )}
@@ -333,9 +436,97 @@ export default function RamadanStreak() {
         )}
       </div>
 
+      {/* GANTI PUASA LIST */}
+      {replacementList.length > 0 && (
+        <div className="card animate-enter delay-300" style={{ marginTop: '20px' }}>
+          <div className="section-label" style={{ marginBottom: '16px' }}>Ganti Puasa ({replacementList.filter(r => !r.completed).length})</div>
+          {replacementList.filter(r => !r.completed).map(item => (
+            <div key={item.id} className="tracker-row" onClick={() => toggleReplacement(item.id)}>
+              <div className="tracker-left">
+                <div className="tracker-icon">📅</div>
+                <div className="tracker-info">
+                  <strong>{item.date}</strong>
+                  <small>{item.reason}</small>
+                </div>
+              </div>
+              <div className="tracker-check"></div>
+            </div>
+          ))}
+          {replacementList.filter(r => !r.completed).length === 0 && (
+            <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>Tiada puasa perlu diganti. Alhamdulillah!</div>
+          )}
+        </div>
+      )}
+
+      {/* REASON MODAL */}
+      {showReasonModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.8)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 999
+        }}>
+          <div style={{ background: 'var(--surface)', padding: '24px', borderRadius: '16px', width: '90%', maxWidth: '320px', border: '1px solid var(--border)' }}>
+            <h3 style={{ marginTop: 0, marginBottom: '16px', color: 'var(--text)' }}>Kenapa tidak berpuasa?</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <button onClick={() => confirmMissedFast("Musafir")} style={{ padding: '12px', borderRadius: '8px', background: 'var(--surface2)', border: 'none', color: 'var(--text)', textAlign: 'left' }}>✈️ Musafir</button>
+              <button onClick={() => confirmMissedFast("Haid")} style={{ padding: '12px', borderRadius: '8px', background: 'var(--surface2)', border: 'none', color: 'var(--text)', textAlign: 'left' }}>🩸 Haid (Auto 7 hari)</button>
+              <button onClick={() => confirmMissedFast("Terbatal")} style={{ padding: '12px', borderRadius: '8px', background: 'var(--surface2)', border: 'none', color: 'var(--text)', textAlign: 'left' }}>❌ Terbatal</button>
+              <button onClick={() => confirmMissedFast("Lain-lain")} style={{ padding: '12px', borderRadius: '8px', background: 'var(--surface2)', border: 'none', color: 'var(--text)', textAlign: 'left' }}>📝 Lain-lain</button>
+            </div>
+            <button onClick={() => setShowReasonModal(false)} style={{ marginTop: '16px', padding: '10px', width: '100%', background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-muted)', borderRadius: '8px' }}>Batal</button>
+          </div>
+        </div>
+      )}
+
       <div style={{ textAlign: 'center', marginTop: '40px', fontSize: '10px', color: 'var(--text-dim)', letterSpacing: '1px' }}>
-        v1.3
+        v1.4 <span onClick={() => setShowAdminLogin(true)} style={{ cursor: 'pointer', opacity: 0.3 }}>🔒</span>
       </div>
+
+      {/* DEV TOOLS (Protected) */}
+      {isAdmin && (
+        <div style={{ marginTop: '40px', borderTop: '1px dashed var(--border)', paddingTop: '20px', animation: 'fadeIn 0.5s' }}>
+          <p style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center', marginBottom: '10px' }}>🛠️ Admin Panel</p>
+          <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button onClick={devReset} style={{ padding: '6px 12px', fontSize: '12px', background: 'var(--red)', color: 'white', border: 'none', borderRadius: '6px' }}>
+              🗑️ Reset
+            </button>
+            <button onClick={() => devStreak(1)} style={{ padding: '6px 12px', fontSize: '12px', background: 'var(--surface2)', color: 'var(--text)', border: 'none', borderRadius: '6px' }}>
+              ➕ Streak
+            </button>
+            <button onClick={() => devStreak(-1)} style={{ padding: '6px 12px', fontSize: '12px', background: 'var(--surface2)', color: 'var(--text)', border: 'none', borderRadius: '6px' }}>
+              ➖ Streak
+            </button>
+            <button onClick={devNewDay} style={{ padding: '6px 12px', fontSize: '12px', background: 'var(--surface2)', color: 'var(--text)', border: 'none', borderRadius: '6px' }}>
+              🔄 New Day
+            </button>
+            <button onClick={() => setIsAdmin(false)} style={{ padding: '6px 12px', fontSize: '12px', background: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border)', borderRadius: '6px' }}>
+              🔒 Lock
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ADMIN LOGIN MODAL */}
+      {showAdminLogin && !isAdmin && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.8)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000
+        }}>
+          <div style={{ background: 'var(--surface)', padding: '24px', borderRadius: '16px', width: '80%', maxWidth: '300px', border: '1px solid var(--border)' }}>
+            <h3 style={{ marginTop: 0, marginBottom: '16px', color: 'var(--text)', textAlign: 'center' }}>Admin Access</h3>
+            <input
+              type="password"
+              placeholder="Enter Password"
+              value={adminPassword}
+              onChange={(e) => setAdminPassword(e.target.value)}
+              style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)', marginBottom: '16px' }}
+            />
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={() => setShowAdminLogin(false)} style={{ flex: 1, padding: '10px', background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-muted)', borderRadius: '8px' }}>Cancel</button>
+              <button onClick={handleAdminLogin} style={{ flex: 1, padding: '10px', background: 'var(--gold)', border: 'none', color: 'var(--surface)', borderRadius: '8px', fontWeight: 'bold' }}>Login</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
