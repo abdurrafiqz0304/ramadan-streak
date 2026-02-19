@@ -12,33 +12,63 @@ export default function RamadanStreak() {
   const [loadingPrayer, setLoadingPrayer] = useState(true);
   const [nextPrayer, setNextPrayer] = useState<string | null>(null);
   const [timeToNextPrayer, setTimeToNextPrayer] = useState<string>("");
+  const [userZone, setUserZone] = useState<string>("PHG03");
+  const [coords, setCoords] = useState<{ lat: number, long: number } | null>(null);
+
+  const fetchWaktuSolat = async (latitude?: number, longitude?: number) => {
+    setLoadingPrayer(true);
+    try {
+      let url = '/api/prayer-times?zone=PHG03';
+      if (latitude && longitude) {
+        url = `/api/prayer-times?lat=${latitude}&long=${longitude}`;
+      }
+
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Failed to fetch');
+      const json = await res.json();
+
+      if (json.zone) setUserZone(json.zone);
+
+      if (json.prayerTime && json.prayerTime.length > 0) {
+        const waktuHariIni = json.prayerTime[0];
+        setPrayerTimes({
+          fajr: waktuHariIni.fajr.substring(0, 5),
+          dhuhr: waktuHariIni.dhuhr.substring(0, 5),
+          asr: waktuHariIni.asr.substring(0, 5),
+          maghrib: waktuHariIni.maghrib.substring(0, 5),
+          isha: waktuHariIni.isha.substring(0, 5),
+        });
+      }
+    } catch (error) {
+      console.error("Gagal tarik waktu solat", error);
+    } finally {
+      setLoadingPrayer(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchWaktuSolat = async () => {
-      try {
-        const res = await fetch('/api/prayer-times?zone=PHG03');
-        if (!res.ok) throw new Error('Failed to fetch');
-        const json = await res.json();
-
-        if (json.prayerTime && json.prayerTime.length > 0) {
-          const waktuHariIni = json.prayerTime[0];
-          setPrayerTimes({
-            fajr: waktuHariIni.fajr.substring(0, 5),
-            dhuhr: waktuHariIni.dhuhr.substring(0, 5),
-            asr: waktuHariIni.asr.substring(0, 5),
-            maghrib: waktuHariIni.maghrib.substring(0, 5),
-            isha: waktuHariIni.isha.substring(0, 5),
-          });
-        }
-      } catch (error) {
-        console.error("Gagal tarik waktu solat", error);
-      } finally {
-        setLoadingPrayer(false);
-      }
-    };
-
     fetchWaktuSolat();
   }, []);
+
+  const detectLocation = () => {
+    if (navigator.geolocation) {
+      setLoadingPrayer(true);
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          setCoords({ lat: latitude, long: longitude });
+          fetchWaktuSolat(latitude, longitude);
+        },
+        (error) => {
+          console.error("Error getting location", error);
+          alert("Gagal mengesan lokasi. Sila pastikan GPS dihidupkan.");
+          setLoadingPrayer(false);
+        }
+      );
+    } else {
+      alert("Pelayar anda tidak menyokong geolokasi.");
+    }
+  };
 
   // Countdown Logic
   useEffect(() => {
@@ -183,7 +213,12 @@ export default function RamadanStreak() {
       {/* BAHAGIAN WAKTU SOLAT */}
       <div className="section-label flex justify-between items-center">
         <span>Waktu Solat</span>
-        <span style={{ fontSize: '10px', background: 'var(--surface2)', padding: '2px 6px', borderRadius: '4px' }}>PHG03</span>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <button onClick={detectLocation} style={{ background: 'none', border: 'none', color: 'var(--gold)', cursor: 'pointer', fontSize: '14px' }}>
+            📍 Set Lokasi
+          </button>
+          <span style={{ fontSize: '10px', background: 'var(--surface2)', padding: '2px 6px', borderRadius: '4px' }}>{userZone}</span>
+        </div>
       </div>
 
       <div className="card prayer-times-card animate-enter delay-300">

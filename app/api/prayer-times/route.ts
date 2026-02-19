@@ -2,12 +2,22 @@ import { NextResponse } from 'next/server';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const zone = searchParams.get('zone') || 'PHG03'; // Default to Jerantut (PHG03)
+  const lat = searchParams.get('lat');
+  const long = searchParams.get('long');
+  let zone = searchParams.get('zone') || 'PHG03'; // Default to Jerantut (PHG03)
 
   try {
-    // Gunakan API Waktu Solat App (Official JAKIM mirror) V2
-    // URL: https://api.waktusolat.app/v2/solat/{zone}
-    const apiUrl = `https://api.waktusolat.app/v2/solat/${zone}`;
+    let apiUrl;
+
+    if (lat && long) {
+      // Use GPS endpoint
+      apiUrl = `https://api.waktusolat.app/v2/solat/gps/${lat}/${long}`;
+    } else {
+      // Use Zone endpoint
+      // Gunakan API Waktu Solat App (Official JAKIM mirror) V2
+      // URL: https://api.waktusolat.app/v2/solat/{zone}
+      apiUrl = `https://api.waktusolat.app/v2/solat/${zone}`;
+    }
 
     const res = await fetch(apiUrl, {
       headers: {
@@ -64,7 +74,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       prayerTime: [formattedPrayer],
       status: 'OK',
-      zone: zone
+      zone: data.zone || zone // Return API detected zone or requested zone
     });
 
   } catch (error) {
