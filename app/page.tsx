@@ -2,6 +2,17 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import HeroSection from "./components/HeroSection";
+import PrayerTimesWidget from "./components/PrayerTimesWidget";
+import DailyChecklist from "./components/DailyChecklist";
+import TerawihTracker from "./components/TerawihTracker";
+import RamadanDiary from "./components/RamadanDiary";
+import MissedFastList from "./components/MissedFastList";
+import Sidebar from "./components/Sidebar";
+import AdminModal from "./components/Modals/AdminModal";
+import ReasonModal from "./components/Modals/ReasonModal";
+import LocationModal from "./components/Modals/LocationModal";
+import { ReplacementDay } from "./types";
 
 import { ZONES } from './data/zones';
 
@@ -61,12 +72,6 @@ export default function Home() {
   const [coords, setCoords] = useState<{ lat: number, long: number } | null>(null);
 
   // Missed Fast Logic
-  interface ReplacementDay {
-    id: number;
-    date: string;
-    reason: string;
-    completed: boolean;
-  }
   const [replacementList, setReplacementList] = useState<ReplacementDay[]>([]);
   const [showReasonModal, setShowReasonModal] = useState(false);
   const [missedReason, setMissedReason] = useState<string>("");
@@ -656,135 +661,32 @@ export default function Home() {
           </div>
         </div>
 
-        {/* HORIZONTAL CALENDAR PICKER */}
-        <div style={{
-          display: 'flex', overflowX: 'auto', gap: '8px', paddingBottom: '16px',
-          marginBottom: '20px', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch',
-          borderBottom: '1px solid var(--border)'
-        }}>
-          {calendarDays.map((calDay, i) => {
-            const isSelected = currentViewDate === calDay.dateStr;
+        <HeroSection
+          calendarDays={calendarDays}
+          currentViewDate={currentViewDate}
+          setCurrentViewDate={setCurrentViewDate}
+          fastStreak={fastStreak}
+        />
 
-            return (
-              <button
-                key={i}
-                disabled={!calDay.isPastOrToday}
-                onClick={() => setCurrentViewDate(calDay.dateStr)}
-                style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                  minWidth: '56px', height: '64px', borderRadius: '16px',
-                  background: isSelected ? 'var(--gold)' : 'var(--surface2)',
-                  color: isSelected ? 'var(--bg)' : (calDay.isPastOrToday ? 'var(--text)' : 'var(--text-muted)'),
-                  opacity: calDay.isPastOrToday ? 1 : 0.4,
-                  border: calDay.isToday && !isSelected ? '1px solid var(--gold)' : '1px solid transparent',
-                  cursor: calDay.isPastOrToday ? 'pointer' : 'not-allowed',
-                  transition: 'all 0.2s',
-                  flexShrink: 0
-                }}
-              >
-                <span style={{ fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>
-                  {calDay.dayName}
-                </span>
-                <span style={{ fontSize: '18px', fontWeight: 'bold' }}>
-                  {calDay.dateVal}
-                </span>
-                {/* Dot for today */}
-                {calDay.isToday && <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: isSelected ? 'var(--bg)' : 'var(--gold)', marginTop: '2px' }} />}
-              </button>
-            )
-          })}
-        </div>
+        <PrayerTimesWidget
+          nextPrayer={nextPrayer}
+          timeToNextPrayer={timeToNextPrayer}
+          prayerTimes={prayerTimes}
+        />
 
-        {/* Warning if viewing past date */}
-        {currentViewDate !== new Date().toLocaleDateString() && (
-          <div style={{ background: 'rgba(201, 168, 76, 0.1)', color: 'var(--gold)', padding: '10px 16px', borderRadius: '12px', fontSize: '12px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span>⏪</span>
-            <span>Anda sedang melihat / edit rekod hari sebelumnya. <b>(Tarikh: {currentViewDate})</b></span>
-          </div>
-        )}
+        <DailyChecklist
+          isFastedToday={isFastedToday}
+          handleFastToday={handleFastToday}
+          handleMissedFast={handleMissedFast}
+          sahoorDone={sahoorDone}
+          handleSahoorToggle={handleSahoorToggle}
+          prayerStatus={prayerStatus}
+          togglePrayer={togglePrayer}
+        />
 
-        {/* HERO SECTION / STREAK */}
-        <Link href="/laporan" style={{ textDecoration: 'none' }}>
-          <div className="hero" style={{ marginTop: '10px' }}>
-            <div className="hero-label">Streak Puasa ✨</div>
-            <div className="hero-streak-row">
-              <div className="hero-num">{fastStreak}</div>
-              <div className="hero-unit">hari</div>
-              {fastStreak > 0 && <span className="animate-pulse" style={{ fontSize: '28px', marginLeft: '8px' }}>🔥</span>}
-            </div>
-            <div className="hero-bar-track" style={{ position: 'relative' }}>
-              <div className="hero-bar-fill" style={{ width: `${Math.min(100, (fastStreak / 30) * 100)}%` }}></div>
-              {/* Emojis floating on the streak bar */}
-              <span style={{ position: 'absolute', left: `${Math.min(100, (fastStreak / 30) * 100)}%`, top: '-14px', fontSize: '20px', transform: 'translateX(-50%)', transition: 'left 1s ease' }}>🌙</span>
-              <span style={{ position: 'absolute', right: '0%', top: '-14px', fontSize: '20px', transform: 'translateX(50%)' }}>🕌</span>
-            </div>
-            <div className="hero-bar-meta">
-              <span>Hari 1</span>
-              <span>Aidilfitri</span>
-            </div>
-          </div>
-        </Link>
-
-        {/* Next Prayer Countdown Widget */}
-        {nextPrayer && (
-          <div className="next-prayer-widget animate-enter delay-100">
-            <div className="next-prayer-label">Seterusnya</div>
-            <div className="next-prayer-name">{nextPrayer}</div>
-            <div className="next-prayer-time">{timeToNextPrayer}</div>
-          </div>
-        )}
-        {/* Daily Prayer Times */}
-        <div id="solat"></div>
-        <div className="section-title">Waktu Solat</div>
-
-        {/* Today tracker card */}
-        <div className="card animate-enter delay-200">
-          <div className="fast-row">
-            <div className="fast-row-top">
-              <div className="fast-main">
-                <div className="tracker-icon">🌙</div>
-                <div className="tracker-info">
-                  <strong>{isFastedToday ? "Berpuasa ✓" : "Puasa Hari Ini"}</strong>
-                  <small>{isFastedToday ? "Barakallahu feek! Teruskan!" : "Konfirmasi puasa anda hari ini"}</small>
-                </div>
-              </div>
-              <div className="fast-btn-area">
-                {(() => {
-                  const recordDate = currentViewDate || new Date().toLocaleDateString();
-                  const missedFastRecord = replacementList.find(r => r.date === recordDate);
-
-                  if (isFastedToday) {
-                    return <span className="fast-action-btn" style={{ border: 'none', background: 'transparent', color: 'var(--gold)' }}>Direkod</span>;
-                  } else if (missedFastRecord) {
-                    return <span className="fast-action-btn" style={{ border: 'none', background: 'transparent', color: 'var(--red)' }}>Tidak Puasa ({missedFastRecord.reason})</span>;
-                  } else {
-                    return (
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <button className="fast-action-btn confirm" onClick={handleFastToday}>✓ Puasa</button>
-                        <button className="fast-action-btn" onClick={handleMissedFast} style={{ background: 'var(--red)', color: 'white', opacity: 0.8 }}>× Tak</button>
-                      </div>
-                    );
-                  }
-                })()}
-              </div>
-            </div>
-          </div>
-
-          <div className={`tracker-row ${sahoorDone ? "checked row-checked" : ""}`} onClick={handleSahoorToggle}>
-            <div className="tracker-left">
-              <div className="tracker-icon">🌅</div>
-              <div className="tracker-info">
-                <strong>Sahoor</strong>
-                <small>Makan sebelum subuh</small>
-              </div>
-            </div>
-            <div className="tracker-check"></div>
-          </div>
-        </div>
-
-        {/* BAHAGIAN WAKTU SOLAT */}
-        <div className="section-label flex justify-between items-center">
-          <span>Waktu Solat</span>
+        {/* BAHAGIAN WAKTU SOLAT (LOCATION TRIGGER) */}
+        <div className="section-label flex justify-between items-center" style={{ marginTop: '20px' }}>
+          <span>Lokasi Terkini</span>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <button onClick={() => setShowLocationModal(true)} disabled={loadingPrayer} style={{ background: 'none', border: 'none', color: 'var(--gold)', cursor: 'pointer', fontSize: '14px', opacity: loadingPrayer ? 0.7 : 1 }}>
               {loadingPrayer ? '🛰️ Mencari...' : `📍 ${userZone}`}
@@ -792,181 +694,30 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="card prayer-times-card animate-enter delay-300">
-          {loadingPrayer ? (
-            <div style={{ padding: '40px', textAlign: 'center', fontSize: '12px', color: 'var(--text-muted)' }}>
-              <div className="animate-spin" style={{ display: 'inline-block', marginBottom: '10px' }}>⏳</div>
-              <br />Mengambil jadual...
-            </div>
-          ) : prayerTimes ? (
-            <div>
-              {prayersList.map((p) => <div key={p.key} className={`prayer-time-row ${nextPrayer === p.name ? 'prayer-next' : ''} ${prayerStatus[p.key] ? 'done' : ''}`} onClick={() => togglePrayer(p.key)}>
-                <div style={{ display: 'flex', alignItems: 'center' }}>
-                  <span className="prayer-time-emoji">{p.emoji}</span>
-                  <span className="prayer-name">{p.name}</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <span className="prayer-time-val">{prayerTimes[p.key]}</span>
-                  <div className="prayer-chk"></div>
-                </div>
-              </div>
-              )}
-            </div>
-          ) : (
-            <div style={{ padding: '20px', textAlign: 'center', fontSize: '12px', color: 'var(--red)' }}>
-              ⚠️ Gagal mendapat waktu solat.
-            </div>
-          )}
-        </div>
-        {/* TERAWIH TRACKER */}
-        <div id="terawih" className="card animate-enter delay-200" style={{ marginTop: '20px', padding: '20px' }}>
-          <div className="section-label" style={{ marginBottom: '16px' }}>Solat Terawih 🕌</div>
+        <TerawihTracker
+          terawihCount={terawihCount}
+          handleTerawih={handleTerawih}
+          isCustomTerawih={isCustomTerawih}
+          setIsCustomTerawih={setIsCustomTerawih}
+          customTerawih={customTerawih}
+          setCustomTerawih={setCustomTerawih}
+          handleCustomTerawihSave={handleCustomTerawihSave}
+        />
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', background: 'var(--surface2)', borderRadius: '16px', padding: '8px' }}>
-            {/* 8 Rakaat */}
-            <button
-              onClick={() => handleTerawih(8)}
-              style={{
-                padding: '14px', borderRadius: '12px', border: 'none',
-                background: terawihCount === 8 ? 'var(--gold)' : 'transparent',
-                color: terawihCount === 8 ? 'var(--surface)' : 'var(--text-muted)',
-                fontWeight: 'bold', transition: 'all 0.2s',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px'
-              }}
-            >
-              <span style={{ fontSize: '16px' }}>8</span>
-              <span style={{ fontSize: '10px', opacity: 0.8 }}>Rakaat</span>
-            </button>
+        <RamadanDiary
+          diary={diary}
+          handleDiaryChange={handleDiaryChange}
+          showSubmitToast={showSubmitToast}
+          setShowSubmitToast={setShowSubmitToast}
+        />
 
-            {/* 20 Rakaat */}
-            <button
-              onClick={() => handleTerawih(20)}
-              style={{
-                padding: '14px', borderRadius: '12px', border: 'none',
-                background: terawihCount === 20 ? 'var(--gold)' : 'transparent',
-                color: terawihCount === 20 ? 'var(--surface)' : 'var(--text-muted)',
-                fontWeight: 'bold', transition: 'all 0.2s',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px'
-              }}
-            >
-              <span style={{ fontSize: '16px' }}>20</span>
-              <span style={{ fontSize: '10px', opacity: 0.8 }}>Rakaat</span>
-            </button>
-
-            {/* Lain-lain */}
-            <button
-              onClick={() => setIsCustomTerawih(true)}
-              style={{
-                padding: '14px', borderRadius: '12px', border: 'none',
-                background: (typeof terawihCount === 'string' && terawihCount !== "Tak Buat") || isCustomTerawih ? 'var(--gold)' : 'transparent',
-                color: (typeof terawihCount === 'string' && terawihCount !== "Tak Buat") || isCustomTerawih ? 'var(--surface)' : 'var(--text-muted)',
-                fontWeight: 'bold', transition: 'all 0.2s',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px'
-              }}
-            >
-              <span style={{ fontSize: '16px' }}>✏️</span>
-              <span style={{ fontSize: '10px', opacity: 0.8 }}>Lain-lain</span>
-            </button>
-
-            {/* Tak Buat */}
-            <button
-              onClick={() => handleTerawih("Tak Buat")}
-              style={{
-                padding: '14px', borderRadius: '12px', border: 'none',
-                background: terawihCount === "Tak Buat" ? 'var(--red)' : 'transparent',
-                color: terawihCount === "Tak Buat" ? 'white' : 'var(--text-muted)',
-                fontWeight: 'bold', transition: 'all 0.2s',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px'
-              }}
-            >
-              <span style={{ fontSize: '16px' }}>🚫</span>
-              <span style={{ fontSize: '10px', opacity: 0.8 }}>Tak Buat</span>
-            </button>
-          </div>
-
-          {/* Custom Input Field */}
-          {isCustomTerawih && (
-            <div style={{ marginTop: '12px', display: 'flex', gap: '8px', animation: 'fadeIn 0.3s' }}>
-              <input
-                type="text"
-                placeholder="Contoh: 12 rakaat / Di rumah"
-                value={customTerawih}
-                onChange={(e) => setCustomTerawih(e.target.value)}
-                style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }}
-              />
-              <button onClick={handleCustomTerawihSave} style={{ padding: '0 16px', borderRadius: '8px', background: 'var(--gold)', color: 'var(--surface)', border: 'none', fontWeight: 'bold' }}>OK</button>
-            </div>
-          )}
-
-          {/* Feedback Message */}
-          {terawihCount !== 0 && !isCustomTerawih && (
-            <div style={{ textAlign: 'center', marginTop: '12px', fontSize: '12px', color: 'var(--gold)', animation: 'fadeIn 0.3s' }}>
-              {terawihCount === "Tak Buat" ? "Tak apa, cuba lagi esok! 💪" : typeof terawihCount === 'string' ? `Rekod: ${terawihCount}` : "✨ Alhamdulillah! Semoga diterima amal."}
-            </div>
-          )}
-        </div>
-
-        <div id="diari" className="card animate-enter delay-200" style={{ marginTop: '20px', padding: '20px' }}>
-          <div className="section-label" style={{ marginBottom: '15px' }}>📔 Diari Ramadan</div>
-          <textarea
-            value={diary}
-            onChange={(e) => handleDiaryChange(e.target.value)}
-            placeholder="Catatan hari ini... (cth: Perasaan, doa, atau checklist ibadah lain)"
-            style={{
-              width: '100%', height: '100px', padding: '12px', borderRadius: '12px',
-              background: 'var(--surface2)', border: 'none', color: 'var(--text)',
-              fontFamily: 'inherit', resize: 'vertical'
-            }}
-          />
-          <button
-            onClick={() => {
-              setShowSubmitToast(true);
-              setTimeout(() => setShowSubmitToast(false), 3000);
-            }}
-            disabled={!diary.trim()}
-            style={{
-              width: '100%', padding: '12px', marginTop: '10px', borderRadius: '12px',
-              background: diary.trim() ? 'var(--gold)' : 'var(--surface2)',
-              color: diary.trim() ? 'var(--bg)' : 'var(--text-muted)',
-              border: 'none', fontWeight: 'bold', cursor: diary.trim() ? 'pointer' : 'not-allowed',
-              transition: 'all 0.2s'
-            }}
-          >
-            Hantar Diari
-          </button>
-          {showSubmitToast && (
-            <div style={{ marginTop: '10px', textAlign: 'center', color: 'var(--gold)', fontSize: '13px', animation: 'fadeIn 0.3s' }}>
-              ✓ Diari berjaya disimpan!
-            </div>
-          )}
-        </div>
-
-        {/* GANTI PUASA LIST */}
-        {replacementList.length > 0 && (
-          <div className="card animate-enter delay-300" style={{ marginTop: '20px', padding: '20px' }}>
-            <div className="section-label" style={{ marginBottom: '16px' }}>Ganti Puasa ({replacementList.filter(r => !r.completed).length})</div>
-            {replacementList.filter(r => !r.completed).map(item => (
-              <div key={item.id} className="tracker-row" onClick={() => toggleReplacement(item.id)}>
-                <div className="tracker-left">
-                  <div className="tracker-icon">📅</div>
-                  <div className="tracker-info">
-                    <strong>{item.date}</strong>
-                    <small>{item.reason}</small>
-                  </div>
-                </div>
-                <div className="tracker-check"></div>
-              </div>
-            ))}
-            {replacementList.filter(r => !r.completed).length === 0 && (
-              <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>Tiada puasa perlu diganti. Alhamdulillah!</div>
-            )}
-          </div>
-        )}
-
-        {/* REASON MODAL WAS HERE */}
+        <MissedFastList
+          replacementList={replacementList}
+          toggleReplacement={toggleReplacement}
+        />
 
         <div style={{ textAlign: 'center', marginTop: '40px', fontSize: '10px', color: 'var(--text-dim)', letterSpacing: '1px' }}>
-          v5.3 <span onClick={() => setShowAdminLogin(true)} style={{ cursor: 'pointer', opacity: 0.3 }}>🔒</span>
+          v5.5 (Refactored) <span onClick={() => setShowAdminLogin(true)} style={{ cursor: 'pointer', opacity: 0.3 }}>🔒</span>
         </div>
 
         {/* DEV TOOLS (Protected) */}
@@ -993,129 +744,36 @@ export default function Home() {
           </div>
         )}
 
-        {/* ADMIN LOGIN MODAL */}
-        {/* SIDEBAR NAVIGATION */}
-        {showSidebar && (
-          <div style={{
-            position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-            background: 'rgba(0,0,0,0.5)', zIndex: 1000,
-            animation: 'fadeIn 0.2s'
-          }} onClick={() => setShowSidebar(false)}>
-            <div style={{
-              width: '280px', height: '100%', background: 'var(--surface)',
-              boxShadow: 'var(--shadow)', padding: '20px',
-              display: 'flex', flexDirection: 'column',
-              animation: 'slideRight 0.3s' // Need to define slideRight or rely on default
-            }} onClick={e => e.stopPropagation()}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
-                <h2 style={{ margin: 0, color: 'var(--gold)' }}>Menu</h2>
-                <button onClick={() => setShowSidebar(false)} style={{ background: 'none', border: 'none', color: 'var(--text)', fontSize: '24px' }}>✕</button>
-              </div>
+        <Sidebar
+          showSidebar={showSidebar}
+          setShowSidebar={setShowSidebar}
+          scrollToSection={scrollToSection}
+        />
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                <button onClick={() => scrollToSection('solat')} style={sidebarLinkStyle}>Query Waktu Solat</button>
-                <button onClick={() => scrollToSection('tracker')} style={sidebarLinkStyle}>Checklist & Sahur</button>
-                <button onClick={() => scrollToSection('terawih')} style={sidebarLinkStyle}>Terawih Tracker</button>
-                <button onClick={() => scrollToSection('diari')} style={sidebarLinkStyle}>Diari Ramadan</button>
-                <button onClick={() => window.location.href = '/laporan'} style={{ ...sidebarLinkStyle, color: 'var(--gold)', border: '1px solid var(--border-gold)' }}>📊 Laporan Penuh</button>
-                <button onClick={() => window.location.href = '/ganti'} style={{ ...sidebarLinkStyle, color: '#ff4d6d', border: '1px solid rgba(255, 77, 109, 0.3)' }}>⚠️ Ganti Puasa</button>
-              </div>
+        <AdminModal
+          showAdminLogin={showAdminLogin}
+          setShowAdminLogin={setShowAdminLogin}
+          adminPassword={adminPassword}
+          setAdminPassword={setAdminPassword}
+          handleAdminLogin={handleAdminLogin}
+        />
 
-              <div style={{ marginTop: 'auto', fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center' }}>
-                Ramadan Streak v1.7 <br />
-                Made with ❤️
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Admin Login Modal */}
-        {showAdminLogin && (
-          <div className="modal-overlay" style={{ display: 'flex' }}>
-            <div className="modal-content animate-enter">
-              <h3>Admin Login</h3>
-              <input
-                type="password"
-                placeholder="Password"
-                value={adminPassword}
-                onChange={e => setAdminPassword(e.target.value)}
-                style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'white' }}
-              />
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button onClick={() => setShowAdminLogin(false)} style={{ flex: 1, padding: '10px', borderRadius: '8px', background: 'var(--surface)', color: 'white', border: 'none' }}>Cancel</button>
-                <button onClick={handleAdminLogin} style={{ flex: 1, padding: '10px', borderRadius: '8px', background: 'var(--gold)', color: 'var(--surface)', border: 'none', fontWeight: 'bold' }}>Login</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* LOCATION MODAL */}
-        {showLocationModal && (
-          <div style={{
-            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-            background: 'rgba(0,0,0,0.8)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000
-          }}>
-            <div style={{ background: 'var(--surface)', padding: '24px', borderRadius: '16px', width: '90%', maxWidth: '350px', border: '1px solid var(--border)', maxHeight: '80vh', overflowY: 'auto' }}>
-              <h3 style={{ marginTop: 0, marginBottom: '16px', color: 'var(--text)', textAlign: 'center' }}>Pilih Kawasan</h3>
-
-              {/* State Selector */}
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '8px', fontSize: '12px' }}>Negeri</label>
-                <select
-                  value={selectedState}
-                  onChange={(e) => setSelectedState(e.target.value)}
-                  style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface2)', color: 'var(--text)' }}
-                >
-                  {Object.keys(ZONES).map(state => (
-                    <option key={state} value={state}>{state}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Zone Selector */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <label style={{ display: 'block', color: 'var(--text-muted)', fontSize: '12px' }}>Zon (Klik untuk pilih)</label>
-                {ZONES[selectedState as keyof typeof ZONES]?.map((zone: any) => (
-                  <button
-                    key={zone.code}
-                    onClick={() => handleZoneChange(zone.code)}
-                    style={{
-                      padding: '12px', borderRadius: '8px', border: 'none',
-                      background: userZone === zone.code ? 'var(--gold)' : 'var(--surface2)',
-                      color: userZone === zone.code ? 'var(--surface)' : 'var(--text)',
-                      textAlign: 'left', fontSize: '13px', lineHeight: '1.4'
-                    }}
-                  >
-                    <div style={{ fontWeight: 'bold' }}>{zone.code}</div>
-                    <div style={{ opacity: 0.8 }}>{zone.name}</div>
-                  </button>
-                ))}
-              </div>
-
-              <button onClick={() => setShowLocationModal(false)} style={{ marginTop: '20px', padding: '10px', width: '100%', background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-muted)', borderRadius: '8px' }}>Tutup</button>
-            </div>
-          </div>
-        )}
+        <LocationModal
+          showLocationModal={showLocationModal}
+          setShowLocationModal={setShowLocationModal}
+          selectedState={selectedState}
+          setSelectedState={setSelectedState}
+          userZone={userZone}
+          handleZoneChange={handleZoneChange}
+          ZONES={ZONES}
+        />
       </div>
 
-      {/* REASON MODAL MOVED OUTSIDE */}
-      {showReasonModal && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.8)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999
-        }}>
-          <div style={{ background: 'var(--surface)', padding: '24px', borderRadius: '16px', width: '90%', maxWidth: '320px', border: '1px solid var(--border)' }}>
-            <h3 style={{ marginTop: 0, marginBottom: '16px', color: 'var(--text)' }}>Kenapa tidak berpuasa?</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <button onClick={() => confirmMissedFast("Musafir")} style={{ padding: '12px', borderRadius: '8px', background: 'var(--surface2)', border: 'none', color: 'var(--text)', textAlign: 'left' }}>✈️ Musafir</button>
-              <button onClick={() => confirmMissedFast("Uzur")} style={{ padding: '12px', borderRadius: '8px', background: 'var(--surface2)', border: 'none', color: 'var(--text)', textAlign: 'left' }}>🩸 Uzur</button>
-              <button onClick={() => confirmMissedFast("Terbatal")} style={{ padding: '12px', borderRadius: '8px', background: 'var(--surface2)', border: 'none', color: 'var(--text)', textAlign: 'left' }}>❌ Terbatal</button>
-              <button onClick={() => confirmMissedFast("Lain-lain")} style={{ padding: '12px', borderRadius: '8px', background: 'var(--surface2)', border: 'none', color: 'var(--text)', textAlign: 'left' }}>📝 Lain-lain</button>
-            </div>
-            <button onClick={() => setShowReasonModal(false)} style={{ marginTop: '16px', padding: '10px', width: '100%', background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-muted)', borderRadius: '8px' }}>Batal</button>
-          </div>
-        </div>
-      )}
+      <ReasonModal
+        showReasonModal={showReasonModal}
+        setShowReasonModal={setShowReasonModal}
+        confirmMissedFast={confirmMissedFast}
+      />
     </>
   );
 }
