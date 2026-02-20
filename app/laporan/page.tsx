@@ -6,6 +6,7 @@ export default function LaporanPage() {
     const [history, setHistory] = useState<any[]>([]);
     const [streak, setStreak] = useState(0);
     const [missedCount, setMissedCount] = useState(0);
+    const [selectedDayDetail, setSelectedDayDetail] = useState<any>(null);
 
     useEffect(() => {
         const saved = localStorage.getItem('ramadan_streak_data');
@@ -122,7 +123,16 @@ export default function LaporanPage() {
             ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '15px' }}>
                     {history.map((day, idx) => (
-                        <div key={idx} className="card" style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px', position: 'relative', overflow: 'hidden', opacity: day.isEmpty ? 0.6 : 1, filter: day.isEmpty ? 'grayscale(0.5)' : 'none' }}>
+                        <div
+                            key={idx}
+                            className="card"
+                            onClick={() => !day.isEmpty && setSelectedDayDetail(day)}
+                            style={{
+                                padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px',
+                                position: 'relative', overflow: 'hidden', opacity: day.isEmpty ? 0.6 : 1,
+                                filter: day.isEmpty ? 'grayscale(0.5)' : 'none', cursor: day.isEmpty ? 'default' : 'pointer'
+                            }}
+                        >
                             {/* Accent color top border if fasted vs not */}
                             <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '4px', background: day.isEmpty ? 'var(--text-dim)' : (day.fasted ? 'var(--gold)' : '#ff4d6d') }}></div>
 
@@ -171,6 +181,71 @@ export default function LaporanPage() {
                 <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '5px' }}>{Math.round((streak / 30) * 100)}% siap</div>
             </div>
 
+            {/* Modal Detail Hari */}
+            {selectedDayDetail && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    background: 'rgba(0,0,0,0.8)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000,
+                    animation: 'fadeIn 0.2s'
+                }} onClick={() => setSelectedDayDetail(null)}>
+                    <div
+                        style={{
+                            background: 'var(--surface)', padding: '24px', borderRadius: '16px', width: '90%', maxWidth: '380px',
+                            border: '1px solid var(--border)', position: 'relative',
+                            animation: 'slideUp 0.3s'
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid var(--border)', paddingBottom: '12px' }}>
+                            <h3 style={{ margin: 0, color: 'var(--gold)' }}>{selectedDayDetail.date}</h3>
+                            {selectedDayDetail.dayNum && <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Hari ke-{selectedDayDetail.dayNum}</span>}
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ color: 'var(--text-muted)' }}>Status Puasa</span>
+                                <strong style={{ color: selectedDayDetail.fasted ? 'var(--text)' : '#ff4d6d' }}>{selectedDayDetail.fasted ? '✅ Berpuasa' : '❌ Tidak Berpuasa'}</strong>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ color: 'var(--text-muted)' }}>Sahur</span>
+                                <strong>{selectedDayDetail.sahoor ? '✅ Ya' : '❌ Tidak'}</strong>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ color: 'var(--text-muted)' }}>Solat Fardu</span>
+                                <strong>{countPrayers(selectedDayDetail.prayerStatus)} / 5 Waktu</strong>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ color: 'var(--text-muted)' }}>Solat Terawih</span>
+                                <strong>{selectedDayDetail.terawih || '0'} Rakaat</strong>
+                            </div>
+
+                            {selectedDayDetail.diary && (
+                                <div style={{ marginTop: '12px' }}>
+                                    <span style={{ color: 'var(--text-muted)', display: 'block', marginBottom: '8px', fontSize: '13px' }}>📔 Diari Ramadan:</span>
+                                    <div style={{
+                                        background: 'var(--surface2)', padding: '14px', borderRadius: '10px',
+                                        fontSize: '14px', fontStyle: 'italic', borderLeft: '3px solid var(--gold)',
+                                        color: 'var(--text)'
+                                    }}>
+                                        "{selectedDayDetail.diary}"
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <button
+                            onClick={() => setSelectedDayDetail(null)}
+                            style={{
+                                marginTop: '28px', padding: '14px', width: '100%', background: 'var(--surface2)',
+                                border: 'none', color: 'var(--text)', borderRadius: '12px', fontWeight: 'bold',
+                                cursor: 'pointer', transition: 'all 0.2s'
+                            }}
+                        >
+                            Tutup
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -74,6 +74,7 @@ export default function Home() {
 
   // Diary State
   const [diary, setDiary] = useState<string>("");
+  const [showSubmitToast, setShowSubmitToast] = useState(false);
 
   // Sidebar & Report State
   const [showSidebar, setShowSidebar] = useState(false);
@@ -886,6 +887,27 @@ export default function Home() {
             fontFamily: 'inherit', resize: 'vertical'
           }}
         />
+        <button
+          onClick={() => {
+            setShowSubmitToast(true);
+            setTimeout(() => setShowSubmitToast(false), 3000);
+          }}
+          disabled={!diary.trim()}
+          style={{
+            width: '100%', padding: '12px', marginTop: '10px', borderRadius: '12px',
+            background: diary.trim() ? 'var(--gold)' : 'var(--surface2)',
+            color: diary.trim() ? 'var(--bg)' : 'var(--text-muted)',
+            border: 'none', fontWeight: 'bold', cursor: diary.trim() ? 'pointer' : 'not-allowed',
+            transition: 'all 0.2s'
+          }}
+        >
+          Hantar Diari
+        </button>
+        {showSubmitToast && (
+          <div style={{ marginTop: '10px', textAlign: 'center', color: 'var(--gold)', fontSize: '13px', animation: 'fadeIn 0.3s' }}>
+            ✓ Diari berjaya disimpan!
+          </div>
+        )}
       </div>
 
       {/* GANTI PUASA LIST */}
@@ -982,6 +1004,7 @@ export default function Home() {
               <button onClick={() => scrollToSection('terawih')} style={sidebarLinkStyle}>Terawih Tracker</button>
               <button onClick={() => scrollToSection('diari')} style={sidebarLinkStyle}>Diari Ramadan</button>
               <button onClick={() => window.location.href = '/laporan'} style={{ ...sidebarLinkStyle, color: 'var(--gold)', border: '1px solid var(--border-gold)' }}>📊 Laporan Penuh</button>
+              <button onClick={() => window.location.href = '/ganti'} style={{ ...sidebarLinkStyle, color: '#ff4d6d', border: '1px solid rgba(255, 77, 109, 0.3)' }}>⚠️ Ganti Puasa</button>
             </div>
 
             <div style={{ marginTop: 'auto', fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center' }}>
