@@ -16,6 +16,32 @@ export default function Home() {
 
   useEffect(() => {
     setCurrentViewDate(new Date().toLocaleDateString());
+
+    // Pre-unlock Audio for Azan Autoplay
+    if (typeof window !== 'undefined') {
+      const w = window as any;
+      if (!w._audioUnlocked) {
+        w._audioS = new Audio('/azanS.mp3');
+        w._audioB = new Audio('/azanB.mp3');
+
+        const unlock = () => {
+          if (!w._audioUnlocked) {
+            w._audioUnlocked = true;
+            w._audioS?.load();
+            w._audioB?.load();
+            // Silent play-pause to satisfy browser requirement
+            w._audioS?.play().then(() => w._audioS?.pause()).catch(() => { });
+            w._audioB?.play().then(() => w._audioB?.pause()).catch(() => { });
+
+            document.removeEventListener('click', unlock);
+            document.removeEventListener('touchstart', unlock);
+          }
+        };
+
+        document.addEventListener('click', unlock);
+        document.addEventListener('touchstart', unlock);
+      }
+    }
   }, []);
 
   // State
@@ -423,6 +449,25 @@ export default function Home() {
       const seconds = Math.floor((diff % (1000 * 60)) / 1000);
 
       setTimeToNextPrayer(`${hours}j ${minutes}m ${seconds}s`);
+
+      // Play Azan when time exactly hits 0
+      if (hours === 0 && minutes === 0 && seconds === 0) {
+        try {
+          const isSubuh = upcoming.name.toLowerCase().includes('subuh');
+          if (typeof window !== 'undefined') {
+            const w = window as any;
+            const audioToPlay = isSubuh ? w._audioS : w._audioB;
+            if (audioToPlay) {
+              audioToPlay.currentTime = 0;
+              audioToPlay.play().catch((e: any) => console.log("Audio play prevented by browser:", e));
+            } else {
+              // Fallback if not unlocked
+              const audio = new Audio(isSubuh ? '/azanS.mp3' : '/azanB.mp3');
+              audio.play().catch((e: any) => console.log("Audio play prevented by browser:", e));
+            }
+          }
+        } catch (e) { }
+      }
 
     }, 1000);
 
