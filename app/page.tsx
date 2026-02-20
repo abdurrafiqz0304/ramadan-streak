@@ -89,6 +89,7 @@ export default function Home() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [adminPassword, setAdminPassword] = useState("");
+  const [devOffsetDays, setDevOffsetDays] = useState(0);
 
   // Prayer Status Checklist
   const [prayerStatus, setPrayerStatus] = useState<Record<string, boolean>>({
@@ -255,6 +256,14 @@ export default function Home() {
   };
 
   useEffect(() => {
+    // Load dev offset
+    try {
+      if (typeof window !== 'undefined') {
+        const offset = localStorage.getItem('ramadan_dev_offset');
+        if (offset) setDevOffsetDays(parseInt(offset, 10));
+      }
+    } catch (e) { }
+
     // Load data
     const savedData = localStorage.getItem('ramadan_streak_data');
     if (savedData) {
@@ -360,6 +369,7 @@ export default function Home() {
     // For simplicity, let's just generate 30 days starting Feb 18, 2026.
     const startOfRamadan = new Date(2026, 1, 18);
     const today = new Date();
+    today.setDate(today.getDate() + devOffsetDays);
     today.setHours(0, 0, 0, 0); // Normalize today
 
     let days = [];
@@ -378,7 +388,7 @@ export default function Home() {
     }
     setCalendarDays(days);
 
-  }, [currentViewDate]);
+  }, [currentViewDate, devOffsetDays]);
 
   const detectLocation = () => {
     if (navigator.geolocation) {
@@ -600,7 +610,15 @@ export default function Home() {
     setSahoorDone(false);
     setPrayerStatus({ fajr: false, dhuhr: false, asr: false, maghrib: false, isha: false });
     saveDataToStorage({ fajr: false, dhuhr: false, asr: false, maghrib: false, isha: false }, newStreak, false, false, replacementList, 0, "");
-    alert("Simulated New Day! (Streak preserved, checked items reset)");
+
+    // Increment offset to unlock calendar
+    const newOffset = devOffsetDays + 1;
+    setDevOffsetDays(newOffset);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('ramadan_dev_offset', newOffset.toString());
+    }
+
+    alert("Simulated New Day! (Streak preserved, checked items reset, Calendar Unlocked)");
   };
 
   const prayersList = [
@@ -964,7 +982,7 @@ export default function Home() {
       )}
 
       <div style={{ textAlign: 'center', marginTop: '40px', fontSize: '10px', color: 'var(--text-dim)', letterSpacing: '1px' }}>
-        v2.0 <span onClick={() => setShowAdminLogin(true)} style={{ cursor: 'pointer', opacity: 0.3 }}>🔒</span>
+        v5.3 <span onClick={() => setShowAdminLogin(true)} style={{ cursor: 'pointer', opacity: 0.3 }}>🔒</span>
       </div>
 
       {/* DEV TOOLS (Protected) */}
