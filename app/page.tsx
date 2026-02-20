@@ -33,6 +33,10 @@ export default function Home() {
             w._audioS?.play().then(() => w._audioS?.pause()).catch(() => { });
             w._audioB?.play().then(() => w._audioB?.pause()).catch(() => { });
 
+            if ('Notification' in window && Notification.permission === 'default') {
+              Notification.requestPermission();
+            }
+
             document.removeEventListener('click', unlock);
             document.removeEventListener('touchstart', unlock);
           }
@@ -453,6 +457,14 @@ export default function Home() {
 
       // Play Azan when time exactly hits 0
       if (hours === 0 && minutes === 0 && seconds === 0) {
+        if ('Notification' in window && Notification.permission === 'granted') {
+          try {
+            new Notification(`Waktu ${upcoming.name}`, {
+              body: `Telah masuk waktu solat fardu ${upcoming.name}.`
+            });
+          } catch (e) { }
+        }
+
         try {
           const isSubuh = upcoming.name.toLowerCase().includes('subuh');
           if (typeof window !== 'undefined') {
