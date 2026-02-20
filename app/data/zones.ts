@@ -71,9 +71,9 @@ export const ZONES = {
         { code: "SWK09", name: "Zon Khas (Kampung Patarikan)" }
     ],
     "Selangor": [
-        { code: "SGR01", name: "Gombak, Petaling, Sepang, Hulu Langat, Hulu Selangor, Shah Alam" },
+        { code: "SGR01", name: "Gombak, Petaling, Petaling Jaya, Subang Jaya, Puchong, Sepang, Hulu Langat, Kajang, Bangi, Ampang, Cheras, Hulu Selangor, Rawang, Shah Alam" },
         { code: "SGR02", name: "Kuala Selangor, Sabak Bernam" },
-        { code: "SGR03", name: "Klang, Kuala Langat" }
+        { code: "SGR03", name: "Klang, Port Klang, Banting, Kuala Langat" }
     ],
     "Terengganu": [
         { code: "TRG01", name: "Kuala Terengganu, Marang, Kuala Nerus" },

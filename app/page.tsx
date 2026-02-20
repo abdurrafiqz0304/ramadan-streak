@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 
 import { ZONES } from './data/zones';
 
@@ -8,6 +9,14 @@ export default function Home() {
   const [fastStreak, setFastStreak] = useState(0);
   const [isFastedToday, setIsFastedToday] = useState(false);
   const [sahoorDone, setSahoorDone] = useState(false);
+
+  // Current Date View Logic
+  const [currentViewDate, setCurrentViewDate] = useState<string>("");
+  const [calendarDays, setCalendarDays] = useState<any[]>([]);
+
+  useEffect(() => {
+    setCurrentViewDate(new Date().toLocaleDateString());
+  }, []);
 
   // State
   const [showLocationModal, setShowLocationModal] = useState(false);
@@ -144,10 +153,11 @@ export default function Home() {
   const saveDataToStorage = (pStatus: any, streak: number, fasted: boolean, sahoor: boolean, replacements: ReplacementDay[], terawih: number | string, diaryEntry: string) => {
     if (typeof window === 'undefined') return;
 
-    const today = new Date().toLocaleDateString();
+    // Save under the currently viewed date, not strictly 'today'
+    const recordDate = currentViewDate || new Date().toLocaleDateString();
+
     const currentDayData = {
-      date: today,
-      streak,
+      date: recordDate,
       fasted,
       sahoor,
       prayerStatus: pStatus,
@@ -164,7 +174,7 @@ export default function Home() {
     // simpler: just use the parameter 'history' (wait, I can't pass history everywhere easily).
     // Let's read from localStorage directly to ensure we have latest history
 
-    let savedHistory = {};
+    let savedHistory: Record<string, any> = {};
     try {
       const existing = localStorage.getItem('ramadan_streak_data');
       if (existing) {
@@ -173,11 +183,41 @@ export default function Home() {
       }
     } catch (e) { }
 
-    const newHistory = { ...savedHistory, [today]: currentDayData };
+    const newHistory = { ...savedHistory, [recordDate]: currentDayData };
+
+    // Recalculate global streak
+    let calculatedStreak = 0;
+    const startOfRamadan = new Date(2026, 1, 18);
+    const todayDate = new Date();
+    todayDate.setHours(0, 0, 0, 0);
+
+    let checkDate = new Date(todayDate);
+    const todayStr = todayDate.toLocaleDateString();
+
+    while (checkDate >= startOfRamadan) {
+      const dateStr = checkDate.toLocaleDateString();
+      const dayData = newHistory[dateStr];
+
+      if (dayData && dayData.fasted) {
+        calculatedStreak++;
+      } else if (dateStr === todayStr && !dayData) {
+        // If today is entirely empty (not filled yet), don't break the streak
+        // just continue checking yesterday
+      } else {
+        // Break streak on an explicitly missed day, or an empty past day
+        break;
+      }
+
+      checkDate.setDate(checkDate.getDate() - 1);
+    }
+
+    setFastStreak(calculatedStreak);
     setHistory(newHistory); // Update state
 
+    // Ensure backwards compatibility with old 'streak' top-level key
     const data = {
       ...currentDayData,
+      streak: calculatedStreak,
       history: newHistory
     };
     localStorage.setItem('ramadan_streak_data', JSON.stringify(data));
@@ -249,6 +289,65 @@ export default function Home() {
       detectLocation();
     }
   }, []);
+
+  // Handle Current View Date Changes
+  useEffect(() => {
+    if (!currentViewDate) return;
+
+    const savedData = localStorage.getItem('ramadan_streak_data');
+    if (savedData) {
+      try {
+        const parsed = JSON.parse(savedData);
+
+        // Load global state
+        if (parsed.streak) setFastStreak(parsed.streak);
+        if (parsed.replacements) setReplacementList(parsed.replacements);
+        if (parsed.history) setHistory(parsed.history);
+
+        // Load specific day state
+        if (parsed.history && parsed.history[currentViewDate]) {
+          const dayData = parsed.history[currentViewDate];
+          setIsFastedToday(dayData.fasted || false);
+          setSahoorDone(dayData.sahoor || false);
+          setPrayerStatus(dayData.prayerStatus || { fajr: false, dhuhr: false, asr: false, maghrib: false, isha: false });
+          setTerawihCount(dayData.terawih || 0);
+          setDiary(dayData.diary || "");
+        } else {
+          // Empty day
+          setIsFastedToday(false);
+          setSahoorDone(false);
+          setPrayerStatus({ fajr: false, dhuhr: false, asr: false, maghrib: false, isha: false });
+          setTerawihCount(0);
+          setDiary("");
+        }
+      } catch (e) {
+        console.error("Error parsing saved data", e);
+      }
+    }
+
+    // Generate Calendar Days Array (from Start of Ramadan to End of Month)
+    // For simplicity, let's just generate 30 days starting Feb 18, 2026.
+    const startOfRamadan = new Date(2026, 1, 18);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Normalize today
+
+    let days = [];
+    let d = new Date(startOfRamadan);
+    for (let i = 0; i < 30; i++) {
+      const isPastOrToday = d <= today;
+      days.push({
+        dateStr: d.toLocaleDateString(),
+        dayNum: i + 1,
+        dayName: d.toLocaleDateString('ms-MY', { weekday: 'short' }), // e.g., Isnh, Sel
+        dateVal: d.getDate(),
+        isPastOrToday: isPastOrToday,
+        isToday: d.toLocaleDateString() === new Date().toLocaleDateString()
+      });
+      d.setDate(d.getDate() + 1);
+    }
+    setCalendarDays(days);
+
+  }, [currentViewDate]);
 
   const detectLocation = () => {
     if (navigator.geolocation) {
@@ -378,9 +477,10 @@ export default function Home() {
     // Logic: always 1 entry per click for now as per feedback.
 
     // Create new entry
+    const recordDate = currentViewDate || new Date().toLocaleDateString();
     const newEntry: ReplacementDay = {
       id: Date.now(),
-      date: new Date().toLocaleDateString(),
+      date: recordDate,
       reason: reason,
       completed: false
     };
@@ -467,32 +567,86 @@ export default function Home() {
   return (
     <div className="app animate-enter">
       {/* Topbar */}
-      <div className="topbar">
+      <div className="topbar" style={{ paddingBottom: '16px' }}>
         <div className="topbar-brand">
           <button onClick={() => setShowSidebar(true)} style={{ background: 'none', border: 'none', color: 'var(--text)', fontSize: '24px', marginRight: '10px', cursor: 'pointer' }}>☰</button>
-          <div>
-            <span className="brand-name">Ramadan</span>
-            <span className="brand-year">1447 AH</span>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <div>
+              <span className="brand-name">Ramadan</span>
+              <span className="brand-year">1447 AH</span>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* CHECKLIST SECTION */}
-      <div id="tracker" style={{ marginTop: '30px' }}>
-        <div className="section-header">Streak Puasa</div>
-        <div className="hero-streak-row">
-          <div className="hero-num">{fastStreak}</div>
-          <div className="hero-unit">hari</div>
-          {fastStreak > 0 && <span className="animate-pulse" style={{ fontSize: '24px', marginLeft: '8px' }}>🔥</span>}
-        </div>
-        <div className="hero-bar-track">
-          <div className="hero-bar-fill" style={{ width: `${(fastStreak / 30) * 100}%` }}></div>
-        </div>
-        <div className="hero-bar-meta">
-          <span>Hari 1</span>
-          <span>Eid</span>
-        </div>
+      {/* HORIZONTAL CALENDAR PICKER */}
+      <div style={{
+        display: 'flex', overflowX: 'auto', gap: '8px', paddingBottom: '16px',
+        marginBottom: '20px', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch',
+        borderBottom: '1px solid var(--border)'
+      }}>
+        {calendarDays.map((calDay, i) => {
+          const isSelected = currentViewDate === calDay.dateStr;
+
+          return (
+            <button
+              key={i}
+              disabled={!calDay.isPastOrToday}
+              onClick={() => setCurrentViewDate(calDay.dateStr)}
+              style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                minWidth: '56px', height: '64px', borderRadius: '16px',
+                background: isSelected ? 'var(--gold)' : 'var(--surface2)',
+                color: isSelected ? 'var(--bg)' : (calDay.isPastOrToday ? 'var(--text)' : 'var(--text-muted)'),
+                opacity: calDay.isPastOrToday ? 1 : 0.4,
+                border: calDay.isToday && !isSelected ? '1px solid var(--gold)' : '1px solid transparent',
+                cursor: calDay.isPastOrToday ? 'pointer' : 'not-allowed',
+                transition: 'all 0.2s',
+                flexShrink: 0
+              }}
+            >
+              <span style={{ fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '2px' }}>
+                {calDay.dayName}
+              </span>
+              <span style={{ fontSize: '18px', fontWeight: 'bold' }}>
+                {calDay.dateVal}
+              </span>
+              {/* Dot for today */}
+              {calDay.isToday && <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: isSelected ? 'var(--bg)' : 'var(--gold)', marginTop: '2px' }} />}
+            </button>
+          )
+        })}
       </div>
+
+      {/* Warning if viewing past date */}
+      {currentViewDate !== new Date().toLocaleDateString() && (
+        <div style={{ background: 'rgba(201, 168, 76, 0.1)', color: 'var(--gold)', padding: '10px 16px', borderRadius: '12px', fontSize: '12px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span>⏪</span>
+          <span>Anda sedang melihat / edit rekod hari sebelumnya. <b>(Tarikh: {currentViewDate})</b></span>
+        </div>
+      )}
+
+      {/* HERO SECTION / STREAK */}
+      <Link href="/laporan" style={{ textDecoration: 'none' }}>
+        <div className="hero" style={{ marginTop: '10px' }}>
+          <div className="hero-label">Streak Puasa ✨</div>
+          <div className="hero-streak-row">
+            <div className="hero-num">{fastStreak}</div>
+            <div className="hero-unit">hari</div>
+            {fastStreak > 0 && <span className="animate-pulse" style={{ fontSize: '28px', marginLeft: '8px' }}>🔥</span>}
+          </div>
+          <div className="hero-bar-track" style={{ position: 'relative' }}>
+            <div className="hero-bar-fill" style={{ width: `${Math.min(100, (fastStreak / 30) * 100)}%` }}></div>
+            {/* Emojis floating on the streak bar */}
+            <span style={{ position: 'absolute', left: `${Math.min(100, (fastStreak / 30) * 100)}%`, top: '-14px', fontSize: '20px', transform: 'translateX(-50%)', transition: 'left 1s ease' }}>🌙</span>
+            <span style={{ position: 'absolute', right: '0%', top: '-14px', fontSize: '20px', transform: 'translateX(50%)' }}>🕌</span>
+          </div>
+          <div className="hero-bar-meta">
+            <span>Hari 1</span>
+            <span>Aidilfitri</span>
+          </div>
+        </div>
+      </Link>
 
       {/* Next Prayer Countdown Widget */}
       {nextPrayer && (
@@ -518,14 +672,23 @@ export default function Home() {
               </div>
             </div>
             <div className="fast-btn-area">
-              {!isFastedToday ? (
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button className="fast-action-btn confirm" onClick={handleFastToday}>✓ Puasa</button>
-                  <button className="fast-action-btn" onClick={handleMissedFast} style={{ background: 'var(--red)', color: 'white', opacity: 0.8 }}>× Tak</button>
-                </div>
-              ) : (
-                <span className="fast-action-btn" style={{ border: 'none', background: 'transparent', color: 'var(--gold)' }}>Direkod</span>
-              )}
+              {(() => {
+                const recordDate = currentViewDate || new Date().toLocaleDateString();
+                const missedFastRecord = replacementList.find(r => r.date === recordDate);
+
+                if (isFastedToday) {
+                  return <span className="fast-action-btn" style={{ border: 'none', background: 'transparent', color: 'var(--gold)' }}>Direkod</span>;
+                } else if (missedFastRecord) {
+                  return <span className="fast-action-btn" style={{ border: 'none', background: 'transparent', color: 'var(--red)' }}>Tidak Puasa ({missedFastRecord.reason})</span>;
+                } else {
+                  return (
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button className="fast-action-btn confirm" onClick={handleFastToday}>✓ Puasa</button>
+                      <button className="fast-action-btn" onClick={handleMissedFast} style={{ background: 'var(--red)', color: 'white', opacity: 0.8 }}>× Tak</button>
+                    </div>
+                  );
+                }
+              })()}
             </div>
           </div>
         </div>
@@ -722,7 +885,7 @@ export default function Home() {
       )}
 
       <div style={{ textAlign: 'center', marginTop: '40px', fontSize: '10px', color: 'var(--text-dim)', letterSpacing: '1px' }}>
-        v1.4 <span onClick={() => setShowAdminLogin(true)} style={{ cursor: 'pointer', opacity: 0.3 }}>🔒</span>
+        v2.0 <span onClick={() => setShowAdminLogin(true)} style={{ cursor: 'pointer', opacity: 0.3 }}>🔒</span>
       </div>
 
       {/* DEV TOOLS (Protected) */}

@@ -1,0 +1,164 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e4]:
+      - button "☰" [ref=e5] [cursor=pointer]
+      - generic [ref=e7]: Ramadan1447 AH
+    - generic [ref=e8]:
+      - button "Rab 18" [ref=e9] [cursor=pointer]:
+        - generic [ref=e10]: Rab
+        - generic [ref=e11]: "18"
+      - button "Kha 19" [ref=e12] [cursor=pointer]:
+        - generic [ref=e13]: Kha
+        - generic [ref=e14]: "19"
+      - button "Jum 20" [ref=e15] [cursor=pointer]:
+        - generic [ref=e16]: Jum
+        - generic [ref=e17]: "20"
+      - button "Sab 21" [disabled] [ref=e19]:
+        - generic [ref=e20]: Sab
+        - generic [ref=e21]: "21"
+      - button "Ahd 22" [disabled] [ref=e22]:
+        - generic [ref=e23]: Ahd
+        - generic [ref=e24]: "22"
+      - button "Isn 23" [disabled] [ref=e25]:
+        - generic [ref=e26]: Isn
+        - generic [ref=e27]: "23"
+      - button "Sel 24" [disabled] [ref=e28]:
+        - generic [ref=e29]: Sel
+        - generic [ref=e30]: "24"
+      - button "Rab 25" [disabled] [ref=e31]:
+        - generic [ref=e32]: Rab
+        - generic [ref=e33]: "25"
+      - button "Kha 26" [disabled] [ref=e34]:
+        - generic [ref=e35]: Kha
+        - generic [ref=e36]: "26"
+      - button "Jum 27" [disabled] [ref=e37]:
+        - generic [ref=e38]: Jum
+        - generic [ref=e39]: "27"
+      - button "Sab 28" [disabled] [ref=e40]:
+        - generic [ref=e41]: Sab
+        - generic [ref=e42]: "28"
+      - button "Ahd 1" [disabled] [ref=e43]:
+        - generic [ref=e44]: Ahd
+        - generic [ref=e45]: "1"
+      - button "Isn 2" [disabled] [ref=e46]:
+        - generic [ref=e47]: Isn
+        - generic [ref=e48]: "2"
+      - button "Sel 3" [disabled] [ref=e49]:
+        - generic [ref=e50]: Sel
+        - generic [ref=e51]: "3"
+      - button "Rab 4" [disabled] [ref=e52]:
+        - generic [ref=e53]: Rab
+        - generic [ref=e54]: "4"
+      - button "Kha 5" [disabled] [ref=e55]:
+        - generic [ref=e56]: Kha
+        - generic [ref=e57]: "5"
+      - button "Jum 6" [disabled] [ref=e58]:
+        - generic [ref=e59]: Jum
+        - generic [ref=e60]: "6"
+      - button "Sab 7" [disabled] [ref=e61]:
+        - generic [ref=e62]: Sab
+        - generic [ref=e63]: "7"
+      - button "Ahd 8" [disabled] [ref=e64]:
+        - generic [ref=e65]: Ahd
+        - generic [ref=e66]: "8"
+      - button "Isn 9" [disabled] [ref=e67]:
+        - generic [ref=e68]: Isn
+        - generic [ref=e69]: "9"
+      - button "Sel 10" [disabled] [ref=e70]:
+        - generic [ref=e71]: Sel
+        - generic [ref=e72]: "10"
+      - button "Rab 11" [disabled] [ref=e73]:
+        - generic [ref=e74]: Rab
+        - generic [ref=e75]: "11"
+      - button "Kha 12" [disabled] [ref=e76]:
+        - generic [ref=e77]: Kha
+        - generic [ref=e78]: "12"
+      - button "Jum 13" [disabled] [ref=e79]:
+        - generic [ref=e80]: Jum
+        - generic [ref=e81]: "13"
+      - button "Sab 14" [disabled] [ref=e82]:
+        - generic [ref=e83]: Sab
+        - generic [ref=e84]: "14"
+      - button "Ahd 15" [disabled] [ref=e85]:
+        - generic [ref=e86]: Ahd
+        - generic [ref=e87]: "15"
+      - button "Isn 16" [disabled] [ref=e88]:
+        - generic [ref=e89]: Isn
+        - generic [ref=e90]: "16"
+      - button "Sel 17" [disabled] [ref=e91]:
+        - generic [ref=e92]: Sel
+        - generic [ref=e93]: "17"
+      - button "Rab 18" [disabled] [ref=e94]:
+        - generic [ref=e95]: Rab
+        - generic [ref=e96]: "18"
+      - button "Kha 19" [disabled] [ref=e97]:
+        - generic [ref=e98]: Kha
+        - generic [ref=e99]: "19"
+    - link "Streak Puasa ✨ 0 hari 🌙 🕌 Hari 1 Aidilfitri" [ref=e100] [cursor=pointer]:
+      - /url: /laporan
+      - generic [ref=e101]:
+        - generic [ref=e102]: Streak Puasa ✨
+        - generic [ref=e103]:
+          - generic [ref=e104]: "0"
+          - generic [ref=e105]: hari
+        - generic [ref=e106]:
+          - generic [ref=e107]: 🌙
+          - generic [ref=e108]: 🕌
+        - generic [ref=e109]:
+          - generic [ref=e110]: Hari 1
+          - generic [ref=e111]: Aidilfitri
+    - generic [ref=e112]: Waktu Solat
+    - generic [ref=e113]:
+      - generic [ref=e115]:
+        - generic [ref=e116]:
+          - generic [ref=e117]: 🌙
+          - generic [ref=e118]:
+            - strong [ref=e119]: Puasa Hari Ini
+            - text: Konfirmasi puasa anda hari ini
+        - generic [ref=e121]:
+          - button "✓ Puasa" [ref=e122] [cursor=pointer]
+          - button "× Tak" [ref=e123] [cursor=pointer]
+      - generic [ref=e125] [cursor=pointer]:
+        - generic [ref=e126]: 🌅
+        - generic [ref=e127]:
+          - strong [ref=e128]: Sahoor
+          - text: Makan sebelum subuh
+    - generic [ref=e130]:
+      - generic [ref=e131]: Waktu Solat
+      - button "📍 PHG03" [ref=e133] [cursor=pointer]
+    - generic [ref=e135]: ⚠️ Gagal mendapat waktu solat.
+    - generic [ref=e136]:
+      - generic [ref=e137]: Solat Terawih 🕌
+      - generic [ref=e138]:
+        - button "8 Rakaat" [ref=e139]:
+          - generic [ref=e140]: "8"
+          - generic [ref=e141]: Rakaat
+        - button "20 Rakaat" [ref=e142]:
+          - generic [ref=e143]: "20"
+          - generic [ref=e144]: Rakaat
+        - button "✏️ Lain-lain" [ref=e145]:
+          - generic [ref=e146]: ✏️
+          - generic [ref=e147]: Lain-lain
+        - button "🚫 Tak Buat" [ref=e148]:
+          - generic [ref=e149]: 🚫
+          - generic [ref=e150]: Tak Buat
+    - generic [ref=e151]:
+      - generic [ref=e152]: 📔 Diari Ramadan
+      - 'textbox "Catatan hari ini... (cth: Perasaan, doa, atau checklist ibadah lain)" [ref=e153]'
+    - generic [ref=e154]: v1.4 🔒
+  - generic [ref=e159] [cursor=pointer]:
+    - button "Open Next.js Dev Tools" [ref=e160]:
+      - img [ref=e161]
+    - generic [ref=e164]:
+      - button "Open issues overlay" [ref=e165]:
+        - generic [ref=e166]:
+          - generic [ref=e167]: "0"
+          - generic [ref=e168]: "1"
+        - generic [ref=e169]: Issue
+      - button "Collapse issues badge" [ref=e170]:
+        - img [ref=e171]
+  - alert [ref=e173]
+```
